@@ -180,6 +180,7 @@ export default function VideoGeneration() {
           animation_prompt: scene.animation_prompt,
           scene_description: scene.scene_description,
           shot_type: scene.shot_type,
+          animation_direction: project?.animation_direction,
         },
       });
 

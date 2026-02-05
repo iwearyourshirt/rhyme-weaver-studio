@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { scene_id, project_id, image_url, animation_prompt, scene_description, shot_type } = await req.json();
+    const { scene_id, project_id, image_url, animation_prompt, scene_description, shot_type, animation_direction } = await req.json();
 
     if (!scene_id || !project_id || !image_url) {
       throw new Error("Missing required fields: scene_id, project_id, image_url");
@@ -53,13 +53,17 @@ Deno.serve(async (req) => {
     console.log(`Starting video generation for scene ${scene_id}`);
     console.log(`Using model: ${VIDEO_MODEL_ENDPOINT}`);
     console.log(`Shot type: ${shot_type || 'medium'}`);
+    console.log(`Animation direction: ${animation_direction || 'none'}`);
 
     // Get camera movement instruction based on shot type
     const cameraInstruction = getCameraMovementForShotType(shot_type || "medium");
 
-    // Construct the motion prompt with shot-appropriate camera movement and calm/peaceful style
+    // Build animation direction prefix (only style matters for video, not visual style)
+    const animationPrefix = animation_direction ? `${animation_direction}. ` : "";
+
+    // Construct the motion prompt with animation direction, shot-appropriate camera movement, and calm/peaceful style
     const basePrompt = animation_prompt || scene_description || "";
-    const motionPrompt = `${cameraInstruction} ${basePrompt}. ${MOTION_STYLE_SUFFIX}`;
+    const motionPrompt = `${animationPrefix}${cameraInstruction} ${basePrompt}. ${MOTION_STYLE_SUFFIX}`;
 
     console.log(`Motion prompt: ${motionPrompt.substring(0, 200)}...`);
 

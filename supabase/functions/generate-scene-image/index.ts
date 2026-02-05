@@ -160,6 +160,19 @@ function getShotTypeInstruction(shotType: string): string {
       console.log(`Shot type: ${shotType}`);
       console.log(`Characters in scene: ${JSON.stringify(scene.characters_in_scene)}`);
      
+      // Fetch project creative direction
+      const { data: project, error: projectError } = await supabase
+        .from("projects")
+        .select("style_direction, cinematography_direction")
+        .eq("id", scene.project_id)
+        .single();
+      
+      const styleDirection = project?.style_direction || "";
+      const cinematographyDirection = project?.cinematography_direction || "";
+      
+      console.log(`Style direction: ${styleDirection}`);
+      console.log(`Cinematography: ${cinematographyDirection}`);
+     
      // Update status to "generating"
      const { error: statusError } = await supabase
        .from("scenes")
@@ -254,12 +267,32 @@ function getShotTypeInstruction(shotType: string): string {
      console.log(`  - As character match: ${includedAsCharacterMatch.join(", ") || "none"}`);
      console.log(`Skipped characters: ${skippedCharacters.join(", ") || "none"}`);
      
-      // Build the prompt with shot type framing and reference image instructions
+      // Build the prompt with creative direction, shot type framing, and reference image instructions
       const shotTypeInstruction = getShotTypeInstruction(shotType);
-      let finalPrompt = `${shotTypeInstruction} ${scene.image_prompt}`;
+      
+      // Check if style keywords already exist in prompt to avoid redundancy
+      const promptLower = scene.image_prompt.toLowerCase();
+      const styleAlreadyInPrompt = styleDirection && 
+        styleDirection.toLowerCase().split(/\s+/).some((word: string) => 
+          word.length > 3 && promptLower.includes(word.toLowerCase())
+        );
+      
+      // Build style prefix (only if not redundant)
+      let stylePrefix = "";
+      if (styleDirection && !styleAlreadyInPrompt) {
+        stylePrefix = `${styleDirection} style. `;
+      }
+      
+      // Add cinematography if present
+      let cinematographyPrefix = "";
+      if (cinematographyDirection) {
+        cinematographyPrefix = `${cinematographyDirection}. `;
+      }
+      
+      let finalPrompt = `${stylePrefix}${cinematographyPrefix}${shotTypeInstruction} ${scene.image_prompt}`;
       
       if (referenceImages.length > 0) {
-        finalPrompt = `Use the provided reference images as character and environment design guides. Match their exact appearance, proportions, colors, and style. The environment/setting reference shows the world these characters live in - use it as the backdrop. ${shotTypeInstruction} ${scene.image_prompt}`;
+        finalPrompt = `Use the provided reference images as character and environment design guides. Match their exact appearance, proportions, colors, and style. ${stylePrefix}${cinematographyPrefix}${shotTypeInstruction} ${scene.image_prompt}`;
       }
       
       console.log(`Final prompt: ${finalPrompt}`);

@@ -11,6 +11,10 @@ function mapProject(data: {
   timestamps: Json | null;
   status: string;
   total_ai_cost: number | null;
+  style_direction: string | null;
+  animation_direction: string | null;
+  cinematography_direction: string | null;
+  creative_brief: string | null;
   created_at: string;
 }): Project {
   let timestamps: TimestampEntry[] | null = null;
@@ -25,6 +29,10 @@ function mapProject(data: {
     status: data.status as ProjectStatus,
     timestamps,
     total_ai_cost: Number(data.total_ai_cost || 0),
+    style_direction: data.style_direction,
+    animation_direction: data.animation_direction,
+    cinematography_direction: data.cinematography_direction,
+    creative_brief: data.creative_brief,
     created_at: data.created_at,
   };
 }
@@ -97,6 +105,10 @@ export function useUpdateProject() {
         lyrics: string | null;
         timestamps: TimestampEntry[] | null;
         status: ProjectStatus;
+        style_direction: string | null;
+        animation_direction: string | null;
+        cinematography_direction: string | null;
+        creative_brief: string | null;
       }>;
     }) => {
       const dbUpdates: Record<string, unknown> = { ...updates };
