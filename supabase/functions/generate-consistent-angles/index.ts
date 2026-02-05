@@ -17,7 +17,7 @@ const ANGLE_SUFFIXES = [
 ];
 
 interface OpenAIImageResponse {
-  data: Array<{ b64_json: string }>;
+  data: Array<{ b64_json?: string; url?: string }>;
 }
 
 serve(async (req) => {
@@ -78,8 +78,9 @@ serve(async (req) => {
       throw new Error(`Failed to download primary image: ${imageResponse.status}`);
     }
     const primaryImageBuffer = await imageResponse.arrayBuffer();
-    const primaryImageBase64 = btoa(String.fromCharCode(...new Uint8Array(primaryImageBuffer)));
-    console.log("Primary image downloaded, size:", primaryImageBuffer.byteLength);
+    const primaryImageBytes = new Uint8Array(primaryImageBuffer);
+    const primaryImageContentType = imageResponse.headers.get("content-type") ?? "image/png";
+    console.log("Primary image downloaded, bytes:", primaryImageBytes.length, "type:", primaryImageContentType);
 
     const timestamp = Date.now();
     const generatedPrompts: string[] = [];
@@ -92,21 +93,26 @@ serve(async (req) => {
       console.log(`Full prompt: ${fullPrompt}`);
       generatedPrompts.push(fullPrompt);
       
-      // Use OpenAI's image edit endpoint with the primary image as reference
+      // Use OpenAI's image edit endpoint with the primary image as reference (multipart/form-data)
+      const form = new FormData();
+      form.append("model", "gpt-image-1");
+      form.append("prompt", fullPrompt);
+      form.append("size", "1024x1024");
+      form.append("quality", "high");
+      form.append("n", "1");
+      form.append(
+        "image",
+        new Blob([primaryImageBytes], { type: primaryImageContentType }),
+        "primary.png",
+      );
+
       const response = await fetch("https://api.openai.com/v1/images/edits", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
+          // NOTE: do not set Content-Type here; fetch will set the multipart boundary
         },
-        body: JSON.stringify({
-          model: "gpt-image-1",
-          image: `data:image/png;base64,${primaryImageBase64}`,
-          prompt: fullPrompt,
-          size: "1024x1024",
-          quality: "high",
-          n: 1,
-        }),
+        body: form,
       });
 
       if (!response.ok) {
@@ -118,13 +124,26 @@ serve(async (req) => {
       const data: OpenAIImageResponse = await response.json();
       console.log(`Angle ${index + 1}/${ANGLE_SUFFIXES.length} generated successfully`);
       
+      // Prefer base64 response; fall back to URL if provided
+      let binaryData: Uint8Array | null = null;
       const b64Data = data.data[0]?.b64_json;
-      if (!b64Data) {
-        throw new Error(`No image data returned for angle ${index + 1}`);
+      const urlData = data.data[0]?.url;
+
+      if (b64Data) {
+        binaryData = Uint8Array.from(atob(b64Data), (c) => c.charCodeAt(0));
+      } else if (urlData) {
+        console.log(`OpenAI returned URL for angle ${index + 1}, downloading...`);
+        const tmpResp = await fetch(urlData);
+        if (!tmpResp.ok) {
+          throw new Error(`Failed to download OpenAI image URL for angle ${index + 1}: ${tmpResp.status}`);
+        }
+        const tmpBuf = await tmpResp.arrayBuffer();
+        binaryData = new Uint8Array(tmpBuf);
       }
 
-      // Convert base64 to binary
-      const binaryData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+      if (!binaryData) {
+        throw new Error(`No image data returned for angle ${index + 1}`);
+      }
       
       // Upload to Supabase storage with timestamp for cache-busting
       const filePath = `${project_id}/${character_id}/angle_${timestamp}_${index + 1}.png`;
