@@ -91,23 +91,17 @@ export default function ProjectSetup() {
       const requestPayload = { audio_url: project.audio_url };
       
       console.log('Calling transcribe-audio edge function...');
-      
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify(requestPayload),
-        }
-      );
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Transcription failed');
+      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+        body: requestPayload,
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Transcription failed');
+      }
+
+      if (!data) {
+        throw new Error('Transcription returned no data');
       }
 
       logApiCall('Transcribe Audio', requestPayload, data);
