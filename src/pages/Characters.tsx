@@ -52,7 +52,7 @@ export default function Characters() {
   const updateCharacter = useUpdateCharacter();
   const deleteCharacter = useDeleteCharacter();
   const updateProject = useUpdateProject();
-  const { setCurrentPage, setProjectData, logApiCall } = useDebug();
+  const { setCurrentPage, setProjectData, logApiCall, logPrompts } = useDebug();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newCharName, setNewCharName] = useState('');
@@ -121,6 +121,11 @@ export default function Characters() {
 
       logApiCall('Generate Reference Images', requestPayload, data);
       
+      // Log prompts to debug panel
+      if (data.prompts && Array.isArray(data.prompts)) {
+        logPrompts('Generate Reference Images', data.prompts);
+      }
+      
       // Save images to character
       await updateCharacter.mutateAsync({
         id: characterId,
@@ -179,6 +184,11 @@ export default function Characters() {
       }
 
       logApiCall('Generate Consistent Angles', requestPayload, data);
+      
+      // Log prompts to debug panel
+      if (data.prompts && Array.isArray(data.prompts)) {
+        logPrompts('Generate Consistent Angles', data.prompts);
+      }
       
       // Append new images to existing ones, keeping primary first
       const existingImages = character.reference_images || [];

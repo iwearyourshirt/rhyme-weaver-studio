@@ -5,13 +5,13 @@
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
  };
  
- const FELTED_STYLE_PREFIX = `Handcrafted felted wool animation style. Soft, fuzzy textures like needle-felted wool toys. Warm, cozy lighting with gentle shadows. Colors are muted but warm — soft oranges, deep teals, cream whites, forest greens. Characters have simple, sweet faces with small dot eyes and subtle smiles. Backgrounds look like layered felt with visible soft texture. The overall aesthetic is a cozy children's storybook brought to life through stop-motion felt animation.`;
+const FELTED_STYLE_PREFIX = `Miniature needle-felted wool doll, photographed with a macro lens with shallow depth of field. The character is a tiny handmade figure made entirely of felted wool fibers with visible fuzzy texture. Black glass bead eyes, soft rounded proportions, stubby short legs, oversized round head. The entire scene is made of felt and wool materials including the ground, grass, and background elements. Warm natural lighting as if photographed on a crafting table near a window. The aesthetic looks like a real physical stop-motion puppet that you could hold in your hand. Shot with a DSLR camera, f/2.8 aperture, soft bokeh background.`;
  
  const POSE_SUFFIXES = [
-   "Full body view, facing camera, standing in neutral pose.",
-   "Upper body portrait, slight smile, looking warmly at viewer.",
-   "Full body, gentle walking pose, three-quarter view.",
-   "Close-up face portrait, gentle expression, soft focus background.",
+  "Front view of the felted doll, full body visible, standing on felted wool grass.",
+  "The felted doll shown from a slightly elevated angle, upper body and face clearly visible, soft blurred background.",
+  "The felted doll in a gentle action pose, arms slightly raised, three-quarter view, standing on felted surface.",
+  "Extreme close-up macro shot of the felted doll's face, showing wool fiber texture detail, black bead eyes, shallow depth of field.",
  ];
  
  interface FluxResponse {
@@ -48,13 +48,17 @@
  
      console.log("Generating images for character:", character_name);
  
-     const basePrompt = `${FELTED_STYLE_PREFIX}\n\nCharacter: ${character_name} - ${character_description}`;
+    const basePrompt = `${FELTED_STYLE_PREFIX}\n\nThis felted doll depicts ${character_name}, ${character_description}`;
  
      // Generate all 4 images in parallel
-     const imagePromises = POSE_SUFFIXES.map(async (suffix, index) => {
+    const generatedPrompts: string[] = [];
+    
+    const imagePromises = POSE_SUFFIXES.map(async (suffix, index) => {
        const fullPrompt = `${basePrompt}\n\n${suffix}`;
        
        console.log(`Generating image ${index + 1}/4...`);
+      console.log(`Full prompt: ${fullPrompt}`);
+      generatedPrompts.push(fullPrompt);
        
       const requestHeaders = new Headers({
         "Content-Type": "application/json",
@@ -94,6 +98,7 @@
      return new Response(
        JSON.stringify({
          images: validUrls,
+        prompts: generatedPrompts,
        }),
        {
          headers: { ...corsHeaders, "Content-Type": "application/json" },

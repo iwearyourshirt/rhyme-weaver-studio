@@ -7,6 +7,12 @@ interface ApiCall {
   response: unknown;
 }
 
+interface PromptLog {
+  timestamp: Date;
+  type: string;
+  prompts: string[];
+}
+
 interface DebugContextType {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
@@ -16,6 +22,9 @@ interface DebugContextType {
   setProjectData: (data: unknown) => void;
   lastApiCall: ApiCall | null;
   logApiCall: (type: string, request: unknown, response: unknown) => void;
+  promptLogs: PromptLog[];
+  logPrompts: (type: string, prompts: string[]) => void;
+  clearPromptLogs: () => void;
 }
 
 const DebugContext = createContext<DebugContextType | undefined>(undefined);
@@ -25,6 +34,7 @@ export function DebugProvider({ children }: { children: ReactNode }) {
   const [currentPage, setCurrentPage] = useState('');
   const [projectData, setProjectData] = useState<unknown>(null);
   const [lastApiCall, setLastApiCall] = useState<ApiCall | null>(null);
+  const [promptLogs, setPromptLogs] = useState<PromptLog[]>([]);
 
   const logApiCall = (type: string, request: unknown, response: unknown) => {
     setLastApiCall({
@@ -33,6 +43,21 @@ export function DebugProvider({ children }: { children: ReactNode }) {
       request,
       response,
     });
+  };
+
+  const logPrompts = (type: string, prompts: string[]) => {
+    setPromptLogs((prev) => [
+      {
+        timestamp: new Date(),
+        type,
+        prompts,
+      },
+      ...prev.slice(0, 9), // Keep last 10 prompt logs
+    ]);
+  };
+
+  const clearPromptLogs = () => {
+    setPromptLogs([]);
   };
 
   return (
@@ -46,6 +71,9 @@ export function DebugProvider({ children }: { children: ReactNode }) {
         setProjectData,
         lastApiCall,
         logApiCall,
+        promptLogs,
+        logPrompts,
+        clearPromptLogs,
       }}
     >
       {children}
