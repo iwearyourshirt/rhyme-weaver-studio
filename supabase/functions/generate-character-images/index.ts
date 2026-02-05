@@ -6,7 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
  };
  
-const FELTED_STYLE_PREFIX = `Needle-felted wool character, looks like a real handmade miniature wool figure photographed with a macro lens. Matte felted texture with visible wool fibers. Expressive face with wool fiber eyebrows, dark glossy eyes, a small rounded nose, and a warm smile with personality. Chunky proportions. Hair made of thick wool fiber clumps. Clean soft-focus background. Natural daylight, shallow depth of field.`;
+const FELTED_STYLE_PREFIX = `Needle-felted wool doll in kawaii chibi proportions, photographed with macro lens. The doll has an oversized wide flat head that is twice the size of its body, very short stubby cylindrical legs with almost no leg visible, and chunky round boots. The face is simple and flat with small black dot eyes spaced wide apart, a tiny nose bump, thin wool eyebrows, and a small gentle smile. Skin is smooth uniform cream-colored felt, not realistic human skin tones. Hair is thick chunky clumps of wool fiber. The overall look is an adorable handmade children's toy, not a realistic figurine. Clean soft-focus background. Natural daylight, shallow depth of field.`;
  
  const POSE_SUFFIXES = [
   "Front view of the felted doll, full body visible, standing on felted wool grass.",
