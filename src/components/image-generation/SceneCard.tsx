@@ -194,7 +194,7 @@ export function SceneCard({
           variant={scene.image_url ? 'outline' : 'default'}
           className="w-full gap-1.5"
           onClick={onGenerate}
-          disabled={isGenerating || generatingAll}
+          disabled={isGenerating || generatingAll || scene.image_status === 'generating'}
         >
           {scene.image_url ? (
             <>
