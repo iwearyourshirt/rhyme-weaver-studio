@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { Scene, GenerationStatus } from '@/types/database';
+import type { Scene, GenerationStatus, ShotType } from '@/types/database';
 
 export function useScenes(projectId: string | undefined) {
   return useQuery({
@@ -65,6 +65,7 @@ export function useUpdateScene() {
       updates: Partial<{
         scene_description: string;
         characters_in_scene: string[];
+        shot_type: ShotType;
         image_prompt: string;
         animation_prompt: string;
         image_url: string | null;
