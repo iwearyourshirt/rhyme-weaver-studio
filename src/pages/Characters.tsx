@@ -97,6 +97,8 @@ export default function Characters() {
       const requestPayload = {
         character_name: character.name,
         character_description: character.description,
+        project_id: projectId,
+        character_id: character.id,
       };
       
       console.log('Calling generate-character-images edge function...');
