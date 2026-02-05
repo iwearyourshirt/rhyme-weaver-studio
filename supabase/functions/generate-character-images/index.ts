@@ -8,10 +8,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  
 const FELTED_STYLE_PREFIX = `Professional needle-felted wool character for a stop-motion animated children's show. High-quality handcrafted felted wool figure with visible wool fiber texture. Photographed with a macro lens, shallow depth of field, warm golden-hour natural light, soft green bokeh background. Always show the full character from top to bottom, never cropped.`;
  
- const POSE_SUFFIXES = [
-  "Front view of the felted doll, full body visible, standing on felted wool grass.",
-  "The felted doll shown from a slightly elevated angle, upper body and face clearly visible, soft blurred background.",
- ];
+const POSE_SUFFIXES = [
+  "Front view of the character, entire figure visible on felted wool grass.",
+  "The character shown from a slightly elevated angle, soft blurred background.",
+];
  
 interface OpenAIImageResponse {
   data: Array<{ b64_json: string }>;
