@@ -16,6 +16,19 @@ const MOTION_STYLE_SUFFIX = `Very slow, dreamlike camera movement. Extremely gen
 // fal.ai queue endpoint
 const FAL_VIDEO_ENDPOINT = `https://queue.fal.run/${VIDEO_MODEL_ENDPOINT}`;
 
+// Camera movement instructions based on shot type
+function getCameraMovementForShotType(shotType: string): string {
+  const movements: Record<string, string> = {
+    "wide": "Slow establishing pan across the scene.",
+    "medium": "Gentle subtle camera movement maintaining framing.",
+    "close-up": "Very slow push-in or subtle drift on the subject's face.",
+    "extreme-close-up": "Nearly static with the tiniest drift on the detail.",
+    "two-shot": "Slow lateral movement keeping both characters in frame.",
+    "over-shoulder": "Gentle drift from behind the shoulder toward the subject.",
+  };
+  return movements[shotType] || movements["medium"];
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -31,7 +44,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { scene_id, project_id, image_url, animation_prompt, scene_description } = await req.json();
+    const { scene_id, project_id, image_url, animation_prompt, scene_description, shot_type } = await req.json();
 
     if (!scene_id || !project_id || !image_url) {
       throw new Error("Missing required fields: scene_id, project_id, image_url");
@@ -39,10 +52,14 @@ Deno.serve(async (req) => {
 
     console.log(`Starting video generation for scene ${scene_id}`);
     console.log(`Using model: ${VIDEO_MODEL_ENDPOINT}`);
+    console.log(`Shot type: ${shot_type || 'medium'}`);
 
-    // Construct the motion prompt with our calm/peaceful style
+    // Get camera movement instruction based on shot type
+    const cameraInstruction = getCameraMovementForShotType(shot_type || "medium");
+
+    // Construct the motion prompt with shot-appropriate camera movement and calm/peaceful style
     const basePrompt = animation_prompt || scene_description || "";
-    const motionPrompt = `${basePrompt}. ${MOTION_STYLE_SUFFIX}`;
+    const motionPrompt = `${cameraInstruction} ${basePrompt}. ${MOTION_STYLE_SUFFIX}`;
 
     console.log(`Motion prompt: ${motionPrompt.substring(0, 200)}...`);
 
