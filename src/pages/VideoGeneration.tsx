@@ -29,6 +29,7 @@ export default function VideoGeneration() {
   useScenesRealtime(projectId);
 
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const toastShownRef = useRef<Set<string>>(new Set());
@@ -248,6 +249,49 @@ export default function VideoGeneration() {
     });
   };
 
+  const cancelVideoGeneration = async (sceneId: string) => {
+    const scene = scenes?.find((s) => s.id === sceneId);
+    if (!scene) return;
+
+    setCancellingIds((prev) => new Set(prev).add(sceneId));
+
+    try {
+      const response = await supabase.functions.invoke('cancel-video-generation', {
+        body: {
+          scene_id: sceneId,
+          request_id: scene.video_request_id,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      logApiCall('Cancel Video Generation', { scene_id: sceneId }, response.data);
+      toast.success(`Scene ${scene.scene_number} generation cancelled`);
+
+      // Update debug context
+      updateVideoSceneStatus({
+        sceneNumber: scene.scene_number,
+        sceneId: sceneId,
+        status: 'pending',
+      });
+
+      // Clear from toast shown ref so it can show again if regenerated
+      toastShownRef.current.delete(sceneId);
+      generationStartTimesRef.current.delete(sceneId);
+    } catch (error) {
+      console.error('Error cancelling video:', error);
+      toast.error(`Failed to cancel: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setCancellingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sceneId);
+        return next;
+      });
+    }
+  };
+
   const handleContinue = async () => {
     if (!projectId) return;
     await updateProject.mutateAsync({
@@ -328,7 +372,9 @@ export default function VideoGeneration() {
               scene={scene}
               projectId={projectId!}
               isGenerating={generatingIds.has(scene.id)}
+              isCancelling={cancellingIds.has(scene.id)}
               onGenerate={() => generateVideo(scene.id)}
+              onCancel={() => cancelVideoGeneration(scene.id)}
               onUpdatePrompt={(prompt) => handleUpdatePrompt(scene.id, prompt)}
             />
           ))}
