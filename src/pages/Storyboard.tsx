@@ -460,56 +460,50 @@ export default function Storyboard() {
        )}
  
         {scenes && scenes.length > 0 ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {scenes.map((scene, index) => (
               <div key={scene.id}>
-                {/* Add Scene Above button - only show for first scene */}
+                {/* Add Scene Above - first scene only */}
                 {index === 0 && (
                   <div className="flex justify-center py-2">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleAddScene('above', scene)}
-                      className="gap-1 text-muted-foreground hover:text-foreground"
+                      className="text-xs text-muted-foreground hover:text-foreground h-8"
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-3.5 w-3.5 mr-1" />
                       Add Scene Above
                     </Button>
                   </div>
                 )}
 
-                <Card className="card-shadow">
-                  <CardHeader className="pb-2">
+                <Card className="border">
+                  {/* Card Header */}
+                  <CardHeader className="p-4 pb-0">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <GripVertical className="h-5 w-5 text-muted-foreground" />
-                        <CardTitle className="text-base">
-                          Scene {scene.scene_number}: {formatTime(scene.start_time)} - {formatTime(scene.end_time)}
-                        </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">
+                          Scene {scene.scene_number}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {formatTime(scene.start_time)} – {formatTime(scene.end_time)}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleSplitScene(scene)}
-                          title="Split Scene"
-                        >
-                          <Scissors className="h-4 w-4" />
+                      <div className="flex items-center gap-0.5">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleSplitScene(scene)} title="Split">
+                          <Scissors className="h-3.5 w-3.5" />
                         </Button>
                         {scenes.find(s => s.scene_number === scene.scene_number + 1) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCombineWithNext(scene)}
-                            title="Combine with Next"
-                          >
-                            <Merge className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCombineWithNext(scene)} title="Combine">
+                            <Merge className="h-3.5 w-3.5" />
                           </Button>
                         )}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" title="Delete Scene">
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Delete">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
@@ -532,187 +526,167 @@ export default function Storyboard() {
                         </AlertDialog>
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground italic ml-8">
+                  </CardHeader>
+
+                  {/* Card Content */}
+                  <CardContent className="p-4 space-y-4">
+                    {/* Lyric snippet */}
+                    <p className="text-sm text-muted-foreground italic">
                       "{scene.lyric_snippet}"
                     </p>
-                  </CardHeader>
-                  <CardContent className="space-y-4 pt-2">
+
+                    {/* Image + Description row */}
                     <div className="flex gap-4">
-                      <div className="w-24 h-24 flex-shrink-0 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center bg-muted/30 relative group">
+                      <button
+                        onClick={() => navigate(`/project/${projectId}/images`)}
+                        className="w-20 h-20 flex-shrink-0 rounded border bg-muted/30 flex items-center justify-center overflow-hidden hover:opacity-80 transition-opacity"
+                      >
                         {scene.image_url ? (
-                          <button
-                            onClick={() => navigate(`/project/${projectId}/images`)}
-                            className="w-full h-full cursor-pointer"
-                            title="Go to Image Generator"
-                          >
-                            <img src={scene.image_url} alt={`Scene ${scene.scene_number}`} className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity" />
-                          </button>
+                          <img src={scene.image_url} alt={`Scene ${scene.scene_number}`} className="w-full h-full object-cover" />
                         ) : (
-                          <button
-                            onClick={() => navigate(`/project/${projectId}/images`)}
-                            className="absolute inset-0 flex flex-col items-center justify-center gap-1 hover:bg-muted/50 rounded-lg transition-colors"
-                            title="Go to Image Generator"
-                          >
-                            <ImageIcon className="h-6 w-6 text-muted-foreground/50" />
-                            <span className="text-[10px] text-muted-foreground">Generate</span>
-                          </button>
+                          <ImageIcon className="h-5 w-5 text-muted-foreground/30" />
                         )}
+                      </button>
+                      <div className="flex-1 space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Scene Description</Label>
+                        <Textarea
+                          value={getEditedValue(scene, 'scene_description')}
+                          onChange={(e) => handleLocalEdit(scene.id, 'scene_description', e.target.value)}
+                          placeholder="Describe what happens in this scene..."
+                          className="min-h-[72px] text-sm"
+                        />
                       </div>
-                   
-                   <div className="space-y-2 flex-1">
-                     <Label className="text-xs text-muted-foreground">Scene Description</Label>
-                     <Textarea
-                       value={getEditedValue(scene, 'scene_description')}
-                       onChange={(e) => handleLocalEdit(scene.id, 'scene_description', e.target.value)}
-                       placeholder="Describe what happens in this scene..."
-                       className="min-h-[80px]"
-                     />
-                   </div>
-                 </div>
+                    </div>
 
-                 {/* Shot Type and Characters row */}
-                 <div className="flex items-center gap-4 flex-wrap">
-                   <div className="flex items-center gap-2">
-                     <Camera className="h-4 w-4 text-muted-foreground" />
-                     <Label className="text-xs text-muted-foreground">Shot:</Label>
-                     <Select
-                       value={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
-                       onValueChange={(value) => handleLocalEdit(scene.id, 'shot_type', value as ShotType)}
-                     >
-                       <SelectTrigger className="h-8 w-40">
-                         <SelectValue />
-                       </SelectTrigger>
-                       <SelectContent>
-                         {SHOT_TYPE_OPTIONS.map((option) => (
-                           <SelectItem key={option.value} value={option.value}>
-                             {option.label}
-                           </SelectItem>
-                         ))}
-                       </SelectContent>
-                     </Select>
-                   </div>
+                    {/* Shot + Characters row */}
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <Camera className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Select
+                          value={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
+                          onValueChange={(value) => handleLocalEdit(scene.id, 'shot_type', value as ShotType)}
+                        >
+                          <SelectTrigger className="h-9 w-36">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SHOT_TYPE_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                   {scene.characters_in_scene.length > 0 && (
-                     <div className="flex items-center gap-2">
-                       <Label className="text-xs text-muted-foreground">Characters:</Label>
-                       <div className="flex flex-wrap gap-1">
-                         {scene.characters_in_scene.map((charName, idx) => (
-                           <Badge key={idx} variant="secondary" className="text-xs">
-                             {charName}
-                           </Badge>
-                         ))}
-                       </div>
-                     </div>
-                   )}
-                 </div>
- 
-                 <Collapsible open={expandedPrompts[scene.id]} onOpenChange={() => togglePromptExpanded(scene.id)}>
-                   <CollapsibleTrigger asChild>
-                     <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground">
-                       {expandedPrompts[scene.id] ? (
-                         <ChevronUp className="h-4 w-4" />
-                       ) : (
-                         <ChevronDown className="h-4 w-4" />
-                       )}
-                       {expandedPrompts[scene.id] ? 'Hide Prompts' : 'Show Prompts'}
-                     </Button>
-                   </CollapsibleTrigger>
-                   <CollapsibleContent className="space-y-4 pt-2">
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
+                      {scene.characters_in_scene.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Characters:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {scene.characters_in_scene.map((charName, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs h-6">{charName}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Prompts collapsible */}
+                    <Collapsible
+                      open={expandedPrompts[scene.id]}
+                      onOpenChange={() => togglePromptExpanded(scene.id)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="px-0 h-8 hover:bg-transparent">
+                          {expandedPrompts[scene.id] ? <ChevronUp className="h-3.5 w-3.5 mr-1.5" /> : <ChevronDown className="h-3.5 w-3.5 mr-1.5" />}
+                          <span className="text-xs font-medium">Show Prompts</span>
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-4 pt-3">
+                        <div className="space-y-1.5">
                           <Label className="text-xs text-muted-foreground">Image Prompt</Label>
                           <Textarea
                             value={getEditedValue(scene, 'image_prompt')}
                             onChange={(e) => handleLocalEdit(scene.id, 'image_prompt', e.target.value)}
-                            placeholder="Prompt for generating the scene image..."
-                            className="min-h-[100px] text-sm"
+                            className="min-h-[72px] text-sm"
                           />
                           <PromptFeedback
-                            promptType="image"
                             currentPrompt={getEditedValue(scene, 'image_prompt')}
-                            sceneDescription={getEditedValue(scene, 'scene_description')}
+                            sceneDescription={scene.scene_description}
+                            promptType="image"
                             onRewrite={(newPrompt) => handleLocalEdit(scene.id, 'image_prompt', newPrompt)}
                           />
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           <Label className="text-xs text-muted-foreground">Animation Prompt</Label>
                           <Textarea
                             value={getEditedValue(scene, 'animation_prompt')}
                             onChange={(e) => handleLocalEdit(scene.id, 'animation_prompt', e.target.value)}
-                            placeholder="Describe how this scene should animate..."
-                            className="min-h-[100px] text-sm"
+                            className="min-h-[72px] text-sm"
                           />
                           <PromptFeedback
-                            promptType="animation"
                             currentPrompt={getEditedValue(scene, 'animation_prompt')}
-                            sceneDescription={getEditedValue(scene, 'scene_description')}
+                            sceneDescription={scene.scene_description}
+                            promptType="animation"
                             onRewrite={(newPrompt) => handleLocalEdit(scene.id, 'animation_prompt', newPrompt)}
                           />
                         </div>
-                     </div>
-                   </CollapsibleContent>
-                 </Collapsible>
- 
-                 {hasUnsavedChanges(scene.id) && (
-                   <div className="flex justify-end pt-2 border-t">
-                     <Button
-                       size="sm"
-                       onClick={() => handleSaveChanges(scene.id)}
-                       disabled={savingSceneId === scene.id}
-                       className="gap-2"
-                     >
-                       {savingSceneId === scene.id ? (
-                         <Loader2 className="h-4 w-4 animate-spin" />
-                       ) : (
-                         <Save className="h-4 w-4" />
-                       )}
-                       Save Changes
-                     </Button>
-                   </div>
-                 )}
-                </CardContent>
-              </Card>
+                      </CollapsibleContent>
+                    </Collapsible>
 
-              {/* Add Scene Below button */}
-              <div className="flex justify-center py-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleAddScene('below', scene)}
-                  className="gap-1 text-muted-foreground hover:text-foreground"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Scene Below
-                </Button>
+                    {/* Save button */}
+                    {hasUnsavedChanges(scene.id) && (
+                      <Button
+                        onClick={() => handleSaveChanges(scene.id)}
+                        disabled={savingSceneId === scene.id}
+                        className="h-9"
+                      >
+                        {savingSceneId === scene.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+                        Save Changes
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Add Scene Below */}
+                <div className="flex justify-center py-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleAddScene('below', scene)}
+                    className="text-xs text-muted-foreground hover:text-foreground h-8"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Add Scene Below
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        ) : (
+          <Card className="border">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <Wand2 className="h-10 w-10 text-muted-foreground/30 mb-4" />
+              <h3 className="text-base font-medium text-foreground mb-2">
+                No scenes yet
+              </h3>
+              <p className="text-sm text-muted-foreground text-center max-w-md">
+                Click "Generate Storyboard" to create scenes from your lyrics.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="flex justify-end pt-4">
+          <Button
+            onClick={handleContinue}
+            disabled={!scenes || scenes.length === 0}
+            className="h-10"
+          >
+            Continue to Image Generation
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
         </div>
-       ) : (
-         <Card className="card-shadow">
-           <CardContent className="flex flex-col items-center justify-center py-16">
-             <Wand2 className="h-16 w-16 text-muted-foreground/50 mb-4" />
-             <h3 className="text-lg font-medium text-foreground mb-2">
-               No scenes yet
-             </h3>
-             <p className="text-muted-foreground text-center max-w-md">
-               Click "Generate Storyboard" to create scenes from your lyrics.
-             </p>
-           </CardContent>
-         </Card>
-       )}
- 
-       <div className="flex justify-end">
-         <Button
-           size="lg"
-           onClick={handleContinue}
-           disabled={!scenes || scenes.length === 0}
-           className="gap-2"
-         >
-           Continue to Image Generation
-           <ArrowRight className="h-4 w-4" />
-         </Button>
-       </div>
-     </div>
-   );
- }
+      </div>
+    );
+  }
