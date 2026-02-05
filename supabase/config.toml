@@ -1,16 +1,25 @@
- project_id = "dfjoqvqkmdmotoubyecm"
- 
- [functions.transcribe-audio]
- verify_jwt = false
- 
- [functions.generate-character-images]
- verify_jwt = false
+project_id = "dfjoqvqkmdmotoubyecm"
+
+[functions.transcribe-audio]
+verify_jwt = false
+
+[functions.generate-character-images]
+verify_jwt = false
 
 [functions.generate-consistent-angles]
 verify_jwt = false
 
 [functions.generate-storyboard]
 verify_jwt = false
- 
- [functions.generate-scene-image]
- verify_jwt = false
+
+[functions.generate-scene-image]
+verify_jwt = false
+
+[functions.rewrite-prompt]
+verify_jwt = false
+
+[functions.generate-scene-video]
+verify_jwt = false
+
+[functions.poll-video-status]
+verify_jwt = false

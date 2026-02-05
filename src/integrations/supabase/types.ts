@@ -101,6 +101,8 @@ export type Database = {
           scene_description: string
           scene_number: number
           start_time: number
+          video_error: string | null
+          video_request_id: string | null
           video_status: string
           video_url: string | null
         }
@@ -119,6 +121,8 @@ export type Database = {
           scene_description: string
           scene_number: number
           start_time: number
+          video_error?: string | null
+          video_request_id?: string | null
           video_status?: string
           video_url?: string | null
         }
@@ -137,6 +141,8 @@ export type Database = {
           scene_description?: string
           scene_number?: number
           start_time?: number
+          video_error?: string | null
+          video_request_id?: string | null
           video_status?: string
           video_url?: string | null
         }
