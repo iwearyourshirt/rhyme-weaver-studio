@@ -25,7 +25,8 @@
  } from '@/components/ui/alert-dialog';
  import { useProject, useUpdateProject } from '@/hooks/useProjects';
  import { useCharacters } from '@/hooks/useCharacters';
- import { useScenes, useCreateScene, useUpdateScene, useDeleteScenes, useDeleteScene, useRenumberScenes } from '@/hooks/useScenes';
+import { useScenes, useCreateScene, useUpdateScene, useDeleteScenes, useDeleteScene, useRenumberScenes } from '@/hooks/useScenes';
+import { useScenesRealtime } from '@/hooks/useScenesRealtime';
  import { useDebug } from '@/contexts/DebugContext';
  import { toast } from 'sonner';
  import type { Scene } from '@/types/database';
@@ -63,7 +64,10 @@
    const deleteScene = useDeleteScene();
    const renumberScenes = useRenumberScenes();
    const updateProject = useUpdateProject();
-   const { setCurrentPage, setProjectData, logApiCall, logPrompts } = useDebug();
+  const { setCurrentPage, setProjectData, logApiCall, logPrompts } = useDebug();
+
+  // Enable realtime updates for cross-page sync
+  useScenesRealtime(projectId);
  
    const [isGenerating, setIsGenerating] = useState(false);
    const [expandedPrompts, setExpandedPrompts] = useState<Record<string, boolean>>({});
