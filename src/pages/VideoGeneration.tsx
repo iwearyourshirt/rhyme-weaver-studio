@@ -411,6 +411,13 @@ export default function VideoGeneration() {
               onGenerate={() => generateVideo(scene.id)}
               onCancel={() => cancelVideoGeneration(scene.id)}
               onUpdatePrompt={(prompt) => handleUpdatePrompt(scene.id, prompt)}
+              onUpdateShotType={async (shotType) => {
+                await updateScene.mutateAsync({
+                  id: scene.id,
+                  projectId: projectId!,
+                  updates: { shot_type: shotType }
+                });
+              }}
             />
           ))}
         </div>

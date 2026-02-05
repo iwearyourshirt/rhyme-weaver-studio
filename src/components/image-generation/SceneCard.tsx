@@ -3,12 +3,20 @@ import { Wand2, RefreshCw, ImageIcon, Check, ChevronDown, ChevronUp, Save, Loade
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PromptFeedback } from '@/components/storyboard/PromptFeedback';
-import type { Scene } from '@/types/database';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Scene, ShotType } from '@/types/database';
+
+const SHOT_TYPE_OPTIONS: { value: ShotType; label: string }[] = [
+  { value: 'wide', label: 'Wide Shot' },
+  { value: 'medium', label: 'Medium Shot' },
+  { value: 'close-up', label: 'Close-Up' },
+  { value: 'extreme-close-up', label: 'Extreme Close-Up' },
+  { value: 'two-shot', label: 'Two-Shot' },
+  { value: 'over-shoulder', label: 'Over-the-Shoulder' },
+];
 
 interface SceneCardProps {
   scene: Scene;
@@ -16,7 +24,7 @@ interface SceneCardProps {
   generatingAll: boolean;
   onGenerate: () => void;
   onApprovalChange: (approved: boolean) => void;
-  onPromptSave: (updates: { image_prompt?: string }) => Promise<void>;
+  onPromptSave: (updates: { image_prompt?: string; shot_type?: ShotType }) => Promise<void>;
 }
 
 function formatTime(seconds: number): string {
@@ -145,6 +153,23 @@ export function SceneCard({
         <p className="text-xs text-muted-foreground line-clamp-2 italic">
           "{scene.lyric_snippet}"
         </p>
+
+        {/* Shot Type Selector */}
+        <Select
+          value={scene.shot_type}
+          onValueChange={(value: ShotType) => onPromptSave({ shot_type: value })}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder="Shot type" />
+          </SelectTrigger>
+          <SelectContent>
+            {SHOT_TYPE_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* Collapsible prompt editor */}
         <Collapsible open={promptExpanded} onOpenChange={setPromptExpanded}>

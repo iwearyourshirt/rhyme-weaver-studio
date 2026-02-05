@@ -7,7 +7,17 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PromptFeedback } from '@/components/storyboard/PromptFeedback';
-import type { Scene } from '@/types/database';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Scene, ShotType } from '@/types/database';
+
+const SHOT_TYPE_OPTIONS: { value: ShotType; label: string }[] = [
+  { value: 'wide', label: 'Wide Shot' },
+  { value: 'medium', label: 'Medium Shot' },
+  { value: 'close-up', label: 'Close-Up' },
+  { value: 'extreme-close-up', label: 'Extreme Close-Up' },
+  { value: 'two-shot', label: 'Two-Shot' },
+  { value: 'over-shoulder', label: 'Over-the-Shoulder' },
+];
 
 interface VideoSceneCardProps {
   scene: Scene;
@@ -17,6 +27,7 @@ interface VideoSceneCardProps {
   onGenerate: () => void;
   onCancel: () => void;
   onUpdatePrompt: (prompt: string) => Promise<void>;
+  onUpdateShotType: (shotType: ShotType) => Promise<void>;
 }
 
 function formatTime(seconds: number): string {
@@ -38,6 +49,7 @@ export function VideoSceneCard({
   onGenerate,
   onCancel,
   onUpdatePrompt,
+  onUpdateShotType,
 }: VideoSceneCardProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -231,6 +243,23 @@ export function VideoSceneCard({
             <p className="text-xs text-muted-foreground line-clamp-2 italic">
               "{scene.lyric_snippet}"
             </p>
+
+            {/* Shot Type Selector */}
+            <Select
+              value={scene.shot_type}
+              onValueChange={(value: ShotType) => onUpdateShotType(value)}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Shot type" />
+              </SelectTrigger>
+              <SelectContent>
+                {SHOT_TYPE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Animation Prompt Editor */}
