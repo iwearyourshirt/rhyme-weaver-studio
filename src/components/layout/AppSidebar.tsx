@@ -1,0 +1,120 @@
+import { Home, Settings, Users, Layout, Image, Video, Download, Music } from 'lucide-react';
+import { NavLink, useParams, useLocation } from 'react-router-dom';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarHeader,
+  SidebarFooter,
+} from '@/components/ui/sidebar';
+import { cn } from '@/lib/utils';
+
+const mainNavItems = [
+  { title: 'Projects', url: '/', icon: Home },
+];
+
+const projectNavItems = [
+  { title: 'Setup', url: 'setup', icon: Music, status: 'setup' },
+  { title: 'Characters', url: 'characters', icon: Users, status: 'characters' },
+  { title: 'Storyboard', url: 'storyboard', icon: Layout, status: 'storyboard' },
+  { title: 'Images', url: 'images', icon: Image, status: 'images' },
+  { title: 'Videos', url: 'videos', icon: Video, status: 'videos' },
+  { title: 'Export', url: 'export', icon: Download, status: 'export' },
+];
+
+export function AppSidebar() {
+  const { projectId } = useParams();
+  const location = useLocation();
+
+  return (
+    <Sidebar className="border-r border-sidebar-border">
+      <SidebarHeader className="p-4 border-b border-sidebar-border">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+            <Music className="h-4 w-4 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="font-display font-semibold text-sidebar-foreground">
+              Rhyme Studio
+            </h1>
+            <p className="text-xs text-muted-foreground">Video Creator</p>
+          </div>
+        </div>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {mainNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to={item.url}
+                      className={({ isActive }) =>
+                        cn(
+                          'flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground transition-colors',
+                          isActive && location.pathname === '/'
+                            ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                            : 'hover:bg-sidebar-accent/50'
+                        )
+                      }
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {projectId && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Project Steps</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {projectNavItems.map((item, index) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to={`/project/${projectId}/${item.url}`}
+                        className={({ isActive }) =>
+                          cn(
+                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground transition-colors',
+                            isActive
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                              : 'hover:bg-sidebar-accent/50'
+                          )
+                        }
+                      >
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                          {index + 1}
+                        </div>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+      </SidebarContent>
+
+      <SidebarFooter className="p-4 border-t border-sidebar-border">
+        <p className="text-xs text-muted-foreground text-center">
+          Nursery Rhyme Video Studio
+        </p>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
