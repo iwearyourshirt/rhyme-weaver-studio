@@ -395,12 +395,12 @@ export default function Characters() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {characters?.map((character) => (
             <Card key={character.id} className="card-shadow group">
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
+               <CardHeader className="flex flex-row items-start justify-between space-y-0 p-3 pb-2">
                  <div className="flex flex-col gap-1">
-                   <CardTitle className="text-lg">{character.name}</CardTitle>
+                    <CardTitle className="text-base">{character.name}</CardTitle>
                    <Badge 
                      variant={character.character_type === 'environment' ? 'secondary' : 'outline'}
                      className="w-fit text-xs gap-1"
@@ -418,27 +418,27 @@ export default function Characters() {
                      )}
                    </Badge>
                  </div>
-                <div className="flex gap-1 -mt-1 -mr-2">
+                 <div className="flex gap-0.5 -mt-1 -mr-1">
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                     size="sm"
+                     className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => setEditingCharacter({
                       id: character.id,
                       name: character.name,
                       description: character.description,
                     })}
                   >
-                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                     <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                   </Button>
                   <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
                       variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                       size="sm"
+                       className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -466,7 +466,7 @@ export default function Characters() {
                 </AlertDialog>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+               <CardContent className="space-y-2 p-3 pt-0">
                  <div className="flex items-center gap-2">
                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Type:</Label>
                    <Select
@@ -499,22 +499,23 @@ export default function Characters() {
                    </Select>
                  </div>
                  
-                <p className="text-sm text-muted-foreground line-clamp-2">
+                 <p className="text-xs text-muted-foreground line-clamp-2">
                   {character.description}
                 </p>
 
                 {character.reference_images.length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
+                   <div className="space-y-2">
+                     <div className="grid grid-cols-3 gap-1.5">
                       {character.reference_images.map((img, idx) => (
                         <div
                           key={idx}
                           className={cn(
-                            'relative aspect-square rounded-lg overflow-hidden border-2 transition-colors group/image',
+                             'relative aspect-square rounded-md overflow-hidden border-2 transition-colors group/image cursor-pointer',
                             character.primary_image_url === img
                               ? 'border-primary'
                               : 'border-transparent hover:border-muted-foreground/50'
                           )}
+                           onClick={() => handleSetPrimary(character.id, img)}
                         >
                           <img
                             src={img}
@@ -527,17 +528,34 @@ export default function Characters() {
                             </div>
                           )}
                           {/* Hover overlay with zoom button */}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/image:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
+                             {character.primary_image_url !== img && (
+                               <Button
+                                 size="sm"
+                                 variant="default"
+                                 className="h-6 text-xs px-2 gap-1 w-full"
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   handleSetPrimary(character.id, img);
+                                 }}
+                               >
+                                 <Star className="h-3 w-3" />
+                                 Primary
+                               </Button>
+                             )}
                             <Button
                               size="sm"
                               variant="secondary"
-                              className="gap-1"
-                              onClick={() => openImagePreview(
+                               className="h-6 text-xs px-2 gap-1 w-full"
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 openImagePreview(
                                 img,
                                 character.id,
                                 character.name,
                                 character.primary_image_url === img
-                              )}
+                               );
+                               }}
                             >
                               <ZoomIn className="h-3 w-3" />
                               View
@@ -545,55 +563,57 @@ export default function Characters() {
                             <Button
                               size="sm"
                               variant="destructive"
-                              className="gap-1"
+                               className="h-6 text-xs px-2 gap-1 w-full"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setDeletingImage({ characterId: character.id, imageUrl: img });
                               }}
                             >
                               <Trash2 className="h-3 w-3" />
-                            </Button>
+                             </Button>
                           </div>
                         </div>
                       ))}
                     </div>
-                    <div className="flex gap-2">
+                     <div className="flex flex-col sm:flex-row gap-1.5">
                       {character.primary_image_url && (
                         <Button
                           variant="default"
                           size="sm"
-                          className="flex-1 gap-2"
+                           className="flex-1 gap-1.5 text-xs h-8"
                           onClick={() => handleGenerateConsistentAngles(character.id)}
                           disabled={generatingAnglesCharId === character.id}
                         >
                           {generatingAnglesCharId === character.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
-                            <RotateCcw className="h-4 w-4" />
+                             <RotateCcw className="h-3.5 w-3.5" />
                           )}
-                          {generatingAnglesCharId === character.id ? 'Generating...' : 'Generate Angles'}
+                           <span className="hidden sm:inline">{generatingAnglesCharId === character.id ? 'Generating...' : 'Generate Angles'}</span>
+                           <span className="sm:hidden">{generatingAnglesCharId === character.id ? '...' : 'Angles'}</span>
                         </Button>
                       )}
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 gap-2"
+                         className="flex-1 gap-1.5 text-xs h-8"
                         onClick={() => handleGenerateImages(character.id)}
                         disabled={generatingCharId === character.id}
                       >
                         {generatingCharId === character.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
-                          <RefreshCw className="h-4 w-4" />
+                           <RefreshCw className="h-3.5 w-3.5" />
                         )}
-                        {generatingCharId === character.id ? 'Regenerating...' : 'New Set'}
+                         <span className="hidden sm:inline">{generatingCharId === character.id ? 'Regenerating...' : 'New Set'}</span>
+                         <span className="sm:hidden">{generatingCharId === character.id ? '...' : 'New'}</span>
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <Button
                     variant="outline"
-                    className="w-full gap-2"
+                     className="w-full gap-2 text-sm"
                     onClick={() => handleGenerateImages(character.id)}
                     disabled={generatingCharId === character.id}
                   >
