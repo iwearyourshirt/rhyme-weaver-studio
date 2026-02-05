@@ -31,6 +31,7 @@ export default function VideoGeneration() {
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [isCancellingAll, setIsCancellingAll] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const toastShownRef = useRef<Set<string>>(new Set());
   const generationStartTimesRef = useRef<Map<string, number>>(new Map());
@@ -244,6 +245,26 @@ export default function VideoGeneration() {
     toast.success(`Started generating ${pendingScenes.length} videos`);
   };
 
+  const handleCancelAll = async () => {
+    if (!scenes) return;
+    
+    const generatingScenes = scenes.filter((s) => s.video_status === 'generating');
+    
+    if (generatingScenes.length === 0) {
+      toast.info('No videos currently generating');
+      return;
+    }
+
+    setIsCancellingAll(true);
+    
+    // Cancel all generating videos in parallel
+    const cancelPromises = generatingScenes.map((scene) => cancelVideoGeneration(scene.id));
+    await Promise.all(cancelPromises);
+    
+    setIsCancellingAll(false);
+    toast.success(`Cancelled ${generatingScenes.length} video generations`);
+  };
+
   const handleUpdatePrompt = async (sceneId: string, newPrompt: string) => {
     await updateScene.mutateAsync({
       id: sceneId,
@@ -354,14 +375,25 @@ export default function VideoGeneration() {
                 </p>
               </div>
             </div>
-            <Button
-              onClick={handleGenerateAll}
-              disabled={isGeneratingAll || generatingCount > 0}
-              className="gap-2"
-            >
-              <Wand2 className="h-4 w-4" />
-              Generate All Videos
-            </Button>
+            {generatingCount > 0 ? (
+              <Button
+                onClick={handleCancelAll}
+                disabled={isCancellingAll}
+                variant="destructive"
+                className="gap-2"
+              >
+                {isCancellingAll ? 'Cancelling...' : 'Cancel All'}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleGenerateAll}
+                disabled={isGeneratingAll}
+                className="gap-2"
+              >
+                <Wand2 className="h-4 w-4" />
+                Generate All Videos
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
