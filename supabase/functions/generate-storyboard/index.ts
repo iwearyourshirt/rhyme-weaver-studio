@@ -21,16 +21,17 @@
    primary_image_url: string | null;
  }
  
- interface GeneratedScene {
-   scene_number: number;
-   start_time: number;
-   end_time: number;
-   lyric_snippet: string;
-   scene_description: string;
-   characters_in_scene: string[];
-   image_prompt: string;
-   animation_prompt: string;
- }
+interface GeneratedScene {
+  scene_number: number;
+  start_time: number;
+  end_time: number;
+  lyric_snippet: string;
+  scene_description: string;
+  characters_in_scene: string[];
+  shot_type: string;
+  image_prompt: string;
+  animation_prompt: string;
+}
  
 interface OpenAIResponse {
   choices: Array<{
@@ -192,18 +193,19 @@ async function logAICost(
        userMessage += `[${ts.start.toFixed(2)}s - ${ts.end.toFixed(2)}s]: "${ts.text}"\n`;
      }
  
-     userMessage += `\nGenerate a storyboard with one scene per lyric line. For each scene provide:
- 
- - scene_number (integer starting at 1)
- - start_time (from the timestamp)
- - end_time (from the timestamp)
- - lyric_snippet (the text for this timestamp)
- - scene_description (2-3 sentences describing what is visually happening in this scene, what the characters are doing, the environment, camera angle, mood)
- - characters_in_scene (array of character names that appear in this scene)
- - image_prompt (a complete image generation prompt that combines the felted wool style with the scene description and character descriptions. This should be detailed enough to generate the image standalone without any other context.)
- - animation_prompt (a short description of how this scene should be animated: what moves, camera motion, character actions. Keep it to 1-2 sentences focused on the key motion.)
- 
- Return the result as a JSON object with a single key "scenes" containing an array of scene objects.`;
+      userMessage += `\nGenerate a storyboard with one scene per lyric line. For each scene provide:
+
+- scene_number (integer starting at 1)
+- start_time (from the timestamp)
+- end_time (from the timestamp)
+- lyric_snippet (the text for this timestamp)
+- scene_description (2-3 sentences describing what is visually happening in this scene, what the characters are doing, the environment, camera angle, mood)
+- characters_in_scene (array of character names that appear in this scene)
+- shot_type (one of: "wide", "medium", "close-up", "extreme-close-up", "two-shot", "over-shoulder". Vary these throughout the storyboard to create visual interest. Use wide shots for establishing scenes and environments, close-ups for emotional moments and character focus, medium shots for dialogue and action, etc.)
+- image_prompt (a complete image generation prompt that combines the felted wool style with the scene description and character descriptions. Include the shot type framing in the prompt. This should be detailed enough to generate the image standalone without any other context.)
+- animation_prompt (a short description of how this scene should be animated: what moves, camera motion, character actions. Keep it to 1-2 sentences focused on the key motion.)
+
+Return the result as a JSON object with a single key "scenes" containing an array of scene objects.`;
  
      console.log("Calling OpenAI API...");
      console.log("System message:", SYSTEM_MESSAGE);
@@ -279,22 +281,23 @@ async function logAICost(
        console.error("Error deleting existing scenes:", deleteError);
      }
  
-     // Insert new scenes
-     const scenesToInsert = generatedScenes.map((scene) => ({
-       project_id,
-       scene_number: scene.scene_number,
-       start_time: scene.start_time,
-       end_time: scene.end_time,
-       lyric_snippet: scene.lyric_snippet,
-       scene_description: scene.scene_description,
-       characters_in_scene: scene.characters_in_scene,
-       image_prompt: scene.image_prompt,
-       animation_prompt: scene.animation_prompt,
-       image_url: null,
-       image_status: "pending",
-       video_url: null,
-       video_status: "pending",
-     }));
+      // Insert new scenes
+      const scenesToInsert = generatedScenes.map((scene) => ({
+        project_id,
+        scene_number: scene.scene_number,
+        start_time: scene.start_time,
+        end_time: scene.end_time,
+        lyric_snippet: scene.lyric_snippet,
+        scene_description: scene.scene_description,
+        characters_in_scene: scene.characters_in_scene,
+        shot_type: scene.shot_type || 'medium',
+        image_prompt: scene.image_prompt,
+        animation_prompt: scene.animation_prompt,
+        image_url: null,
+        image_status: "pending",
+        video_url: null,
+        video_status: "pending",
+      }));
  
      const { data: insertedScenes, error: insertError } = await supabase
        .from("scenes")

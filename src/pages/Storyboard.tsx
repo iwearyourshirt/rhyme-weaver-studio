@@ -1,9 +1,11 @@
- import { useEffect, useState } from 'react';
- import { useParams, useNavigate } from 'react-router-dom';
- import { ArrowRight, Wand2, GripVertical, ChevronDown, ChevronUp, Scissors, Merge, Trash2, Save, Loader2, Clock, Film, RefreshCw, ImageIcon, Plus } from 'lucide-react';
- import { Button } from '@/components/ui/button';
-  import { Label } from '@/components/ui/label';
-  import { PromptFeedback } from '@/components/storyboard/PromptFeedback';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { ArrowRight, Wand2, GripVertical, ChevronDown, ChevronUp, Scissors, Merge, Trash2, Save, Loader2, Clock, Film, RefreshCw, ImageIcon, Plus, Camera } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { PromptFeedback } from '@/components/storyboard/PromptFeedback';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { ShotType } from '@/types/database';
  import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
  import { Textarea } from '@/components/ui/textarea';
  import { Badge } from '@/components/ui/badge';
@@ -46,13 +48,23 @@ import { useScenesRealtime } from '@/hooks/useScenesRealtime';
    return `${secs}s`;
  }
  
- interface SceneEdits {
-   scene_description?: string;
-   image_prompt?: string;
-   animation_prompt?: string;
- }
- 
- export default function Storyboard() {
+interface SceneEdits {
+  scene_description?: string;
+  image_prompt?: string;
+  animation_prompt?: string;
+  shot_type?: ShotType;
+}
+
+const SHOT_TYPE_OPTIONS: { value: ShotType; label: string }[] = [
+  { value: 'wide', label: 'Wide Shot' },
+  { value: 'medium', label: 'Medium Shot' },
+  { value: 'close-up', label: 'Close-up' },
+  { value: 'extreme-close-up', label: 'Extreme Close-up' },
+  { value: 'two-shot', label: 'Two Shot' },
+  { value: 'over-shoulder', label: 'Over Shoulder' },
+];
+
+export default function Storyboard() {
    const { projectId } = useParams();
    const navigate = useNavigate();
    const { data: project } = useProject(projectId);
@@ -213,24 +225,25 @@ import { useScenesRealtime } from '@/hooks/useScenesRealtime';
          updates: { end_time: midTime },
        });
        
-        await createScene.mutateAsync({
-          project_id: projectId,
-          scene_number: scene.scene_number + 1,
-          start_time: midTime,
-          end_time: scene.end_time,
-          lyric_snippet: scene.lyric_snippet,
-          scene_description: scene.scene_description,
-          characters_in_scene: scene.characters_in_scene,
-          image_prompt: scene.image_prompt,
-          animation_prompt: scene.animation_prompt,
-          image_url: null,
-          image_status: 'pending',
-          image_approved: false,
-          video_url: null,
-          video_status: 'pending',
-          video_request_id: null,
-          video_error: null,
-        });
+         await createScene.mutateAsync({
+           project_id: projectId,
+           scene_number: scene.scene_number + 1,
+           start_time: midTime,
+           end_time: scene.end_time,
+           lyric_snippet: scene.lyric_snippet,
+           scene_description: scene.scene_description,
+           characters_in_scene: scene.characters_in_scene,
+           shot_type: scene.shot_type,
+           image_prompt: scene.image_prompt,
+           animation_prompt: scene.animation_prompt,
+           image_url: null,
+           image_status: 'pending',
+           image_approved: false,
+           video_url: null,
+           video_status: 'pending',
+           video_request_id: null,
+           video_error: null,
+         });
        
        const scenesAfter = scenes
          .filter(s => s.scene_number > scene.scene_number)
@@ -324,6 +337,7 @@ import { useScenesRealtime } from '@/hooks/useScenesRealtime';
           lyric_snippet: '',
           scene_description: 'New scene - add description',
           characters_in_scene: [],
+          shot_type: 'medium',
           image_prompt: '',
           animation_prompt: '',
           image_url: null,
@@ -554,19 +568,42 @@ import { useScenesRealtime } from '@/hooks/useScenesRealtime';
                      />
                    </div>
                  </div>
- 
-                 {scene.characters_in_scene.length > 0 && (
+
+                 {/* Shot Type and Characters row */}
+                 <div className="flex items-center gap-4 flex-wrap">
                    <div className="flex items-center gap-2">
-                     <Label className="text-xs text-muted-foreground">Characters:</Label>
-                     <div className="flex flex-wrap gap-1">
-                       {scene.characters_in_scene.map((charName, idx) => (
-                         <Badge key={idx} variant="secondary" className="text-xs">
-                           {charName}
-                         </Badge>
-                       ))}
-                     </div>
+                     <Camera className="h-4 w-4 text-muted-foreground" />
+                     <Label className="text-xs text-muted-foreground">Shot:</Label>
+                     <Select
+                       value={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
+                       onValueChange={(value) => handleLocalEdit(scene.id, 'shot_type', value as ShotType)}
+                     >
+                       <SelectTrigger className="h-8 w-40">
+                         <SelectValue />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {SHOT_TYPE_OPTIONS.map((option) => (
+                           <SelectItem key={option.value} value={option.value}>
+                             {option.label}
+                           </SelectItem>
+                         ))}
+                       </SelectContent>
+                     </Select>
                    </div>
-                 )}
+
+                   {scene.characters_in_scene.length > 0 && (
+                     <div className="flex items-center gap-2">
+                       <Label className="text-xs text-muted-foreground">Characters:</Label>
+                       <div className="flex flex-wrap gap-1">
+                         {scene.characters_in_scene.map((charName, idx) => (
+                           <Badge key={idx} variant="secondary" className="text-xs">
+                             {charName}
+                           </Badge>
+                         ))}
+                       </div>
+                     </div>
+                   )}
+                 </div>
  
                  <Collapsible open={expandedPrompts[scene.id]} onOpenChange={() => togglePromptExpanded(scene.id)}>
                    <CollapsibleTrigger asChild>
