@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const FAL_STATUS_BASE = "https://queue.fal.run/fal-ai/kling-video/v2.1/standard/image-to-video/requests";
+const FAL_MODEL_ID = "fal-ai/kling-video/v2.1/standard/image-to-video";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -56,9 +56,11 @@ Deno.serve(async (req) => {
     // Poll each scene's status
     for (const scene of generatingScenes) {
       try {
-        const statusUrl = `${FAL_STATUS_BASE}/${scene.video_request_id}/status`;
+        // Correct fal.ai queue status URL format: https://queue.fal.run/{model_id}/requests/{request_id}/status
+        const statusUrl = `https://queue.fal.run/${FAL_MODEL_ID}/requests/${scene.video_request_id}/status`;
         
         const statusResponse = await fetch(statusUrl, {
+          method: "GET",
           headers: {
             "Authorization": `Key ${FAL_API_KEY}`,
           },
@@ -74,8 +76,9 @@ Deno.serve(async (req) => {
 
         if (statusResult.status === "COMPLETED") {
           // Fetch the actual result
-          const resultUrl = `${FAL_STATUS_BASE}/${scene.video_request_id}`;
+          const resultUrl = `https://queue.fal.run/${FAL_MODEL_ID}/requests/${scene.video_request_id}`;
           const resultResponse = await fetch(resultUrl, {
+            method: "GET",
             headers: {
               "Authorization": `Key ${FAL_API_KEY}`,
             },
