@@ -27,27 +27,25 @@ export default function ImageGeneration() {
   const { setCurrentPage, setProjectData, logApiCall } = useDebug();
 
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+   const [generatingAll, setGeneratingAll] = useState(false);
 
   useEffect(() => {
     setCurrentPage('Image Generation');
     setProjectData({ project, scenes });
   }, [setCurrentPage, setProjectData, project, scenes]);
 
-  const doneCount = scenes?.filter((s) => s.image_status === 'done').length || 0;
+   const doneCount = scenes?.filter((s) => s.image_status === 'done').length || 0;
   const totalCount = scenes?.length || 0;
-  const allDone = doneCount === totalCount && totalCount > 0;
+   const allDone = doneCount === totalCount && totalCount > 0;
 
   const generateImage = async (sceneId: string) => {
     setGeneratingIds((prev) => new Set(prev).add(sceneId));
 
-    await updateScene.mutateAsync({
-      id: sceneId,
-      projectId: projectId!,
-      updates: { image_status: 'generating' },
-    });
-
      try {
-       const requestPayload = { scene_id: sceneId, project_id: projectId };
+        const requestPayload = { scene_id: sceneId };
+        
+        // Log the request to debug panel
+        console.log('Generating scene image:', requestPayload);
        
        const { data, error } = await supabase.functions.invoke('generate-scene-image', {
          body: requestPayload,
@@ -55,32 +53,14 @@ export default function ImageGeneration() {
        
        if (error) {
          console.error('Edge function error:', error);
-         await updateScene.mutateAsync({
-           id: sceneId,
-           projectId: projectId!,
-           updates: { image_status: 'failed' },
-         });
          logApiCall('Generate Scene Image', requestPayload, { error: error.message });
          toast.error(`Failed to generate image: ${error.message}`);
-         setGeneratingIds((prev) => {
-           const next = new Set(prev);
-           next.delete(sceneId);
-           return next;
-         });
-         return;
+        } else {
+          logApiCall('Generate Scene Image', requestPayload, data);
+          toast.success(`Scene image generated successfully`);
        }
-       
-       logApiCall('Generate Scene Image', requestPayload, data);
-       
-       // The edge function already updates the scene, but we refetch via the hook
-       // Just remove from generating set - the query will refetch
      } catch (err) {
        console.error('Unexpected error:', err);
-       await updateScene.mutateAsync({
-         id: sceneId,
-         projectId: projectId!,
-         updates: { image_status: 'failed' },
-       });
        toast.error('An unexpected error occurred');
      }
  
@@ -93,15 +73,19 @@ export default function ImageGeneration() {
 
   const handleGenerateAll = async () => {
     if (!scenes) return;
+     
+     setGeneratingAll(true);
 
     const pendingScenes = scenes.filter(
-      (s) => s.image_status === 'pending' || s.image_status === 'failed'
+       (s) => s.image_status !== 'done' && s.image_status !== 'generating'
     );
 
+     // Generate sequentially (one at a time)
     for (const scene of pendingScenes) {
       await generateImage(scene.id);
     }
 
+     setGeneratingAll(false);
     toast.success('All images generated!');
   };
 
@@ -140,12 +124,12 @@ export default function ImageGeneration() {
         </div>
         <div className="flex items-center gap-4">
           <div className="text-sm text-muted-foreground">
-            {doneCount} / {totalCount} complete
+             {doneCount} / {totalCount} complete
           </div>
-          <Progress value={(doneCount / totalCount) * 100} className="w-32" />
+           <Progress value={(doneCount / totalCount) * 100} className="w-32" />
           <Button
             onClick={handleGenerateAll}
-            disabled={generatingIds.size > 0 || allDone}
+             disabled={generatingIds.size > 0 || generatingAll || allDone}
             className="gap-2"
           >
             <Wand2 className="h-4 w-4" />
@@ -194,12 +178,12 @@ export default function ImageGeneration() {
                 </p>
                 <Button
                   size="sm"
-                  variant={scene.image_status === 'done' ? 'outline' : 'default'}
+                   variant={scene.image_status === 'done' ? 'outline' : 'default'}
                   className="w-full gap-1.5"
                   onClick={() => generateImage(scene.id)}
-                  disabled={generatingIds.has(scene.id)}
+                   disabled={generatingIds.has(scene.id) || generatingAll}
                 >
-                  {scene.image_status === 'done' ? (
+                   {scene.image_status === 'done' ? (
                     <>
                       <RefreshCw className="h-3.5 w-3.5" />
                       Regenerate
@@ -233,7 +217,7 @@ export default function ImageGeneration() {
         <Button
           size="lg"
           onClick={handleContinue}
-          disabled={!allDone}
+           disabled={!allDone}
           className="gap-2"
         >
           Continue to Video Generation

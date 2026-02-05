@@ -12,20 +12,25 @@
      return new Response("ok", { headers: corsHeaders });
    }
    
+   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+   
+   let sceneId: string | undefined;
+   
    try {
-     const { scene_id, project_id } = await req.json();
+     const { scene_id } = await req.json();
+     sceneId = scene_id;
      
-     if (!scene_id || !project_id) {
+     if (!scene_id) {
        return new Response(
-         JSON.stringify({ error: "scene_id and project_id are required" }),
+         JSON.stringify({ error: "scene_id is required" }),
          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
        );
      }
      
-     console.log(`Generating scene image for scene ${scene_id} in project ${project_id}`);
+     console.log(`Generating scene image for scene ${scene_id}`);
      
-     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
      const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
      
      if (!openaiApiKey) {
@@ -36,12 +41,10 @@
        );
      }
      
-     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-     
-     // Fetch the scene to get the image prompt
+     // Fetch the scene to get the image prompt and project_id
      const { data: scene, error: sceneError } = await supabase
        .from("scenes")
-       .select("image_prompt")
+       .select("image_prompt, project_id")
        .eq("id", scene_id)
        .single();
      
@@ -54,6 +57,16 @@
      }
      
      console.log(`Image prompt: ${scene.image_prompt}`);
+     
+     // Update status to "generating"
+     const { error: statusError } = await supabase
+       .from("scenes")
+       .update({ image_status: "generating" })
+       .eq("id", scene_id);
+     
+     if (statusError) {
+       console.error("Failed to update status to generating:", statusError);
+     }
      
      // Call OpenAI API to generate the image
      const openaiResponse = await fetch("https://api.openai.com/v1/images/generations", {
@@ -74,6 +87,13 @@
      if (!openaiResponse.ok) {
        const errorText = await openaiResponse.text();
        console.error("OpenAI API error:", openaiResponse.status, errorText);
+       
+       // Set status to failed
+       await supabase
+         .from("scenes")
+         .update({ image_status: "failed" })
+         .eq("id", scene_id);
+       
        return new Response(
          JSON.stringify({ error: "Failed to generate image", details: errorText }),
          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -100,27 +120,40 @@
        imageBytes = new Uint8Array(await imageResponse.arrayBuffer());
      } else {
        console.error("No image data in response");
+       
+       // Set status to failed
+       await supabase
+         .from("scenes")
+         .update({ image_status: "failed" })
+         .eq("id", scene_id);
+       
        return new Response(
          JSON.stringify({ error: "No image data in OpenAI response" }),
          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
        );
      }
      
-     // Upload to scene-images bucket
-     const timestamp = Date.now();
-     const filePath = `${project_id}/${scene_id}/${timestamp}.png`;
+     // Upload to character-images bucket at path: {project_id}/scenes/{scene_id}.png
+     const filePath = `${scene.project_id}/scenes/${scene_id}.png`;
      
-     console.log(`Uploading to scene-images/${filePath}`);
+     console.log(`Uploading to character-images/${filePath}`);
      
      const { error: uploadError } = await supabase.storage
-       .from("scene-images")
+       .from("character-images")
        .upload(filePath, imageBytes, {
          contentType: "image/png",
-         upsert: false,
+         upsert: true, // Allow overwriting for regeneration
        });
      
      if (uploadError) {
        console.error("Upload error:", uploadError);
+       
+       // Set status to failed
+       await supabase
+         .from("scenes")
+         .update({ image_status: "failed" })
+         .eq("id", scene_id);
+       
        return new Response(
          JSON.stringify({ error: "Failed to upload image", details: uploadError.message }),
          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -129,18 +162,19 @@
      
      // Get public URL
      const { data: publicUrlData } = supabase.storage
-       .from("scene-images")
+       .from("character-images")
        .getPublicUrl(filePath);
      
-     const imageUrl = publicUrlData.publicUrl;
+     // Add cache-busting query param for regeneration
+     const imageUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
      console.log(`Image uploaded: ${imageUrl}`);
      
-     // Update scene record with the new image URL and status
+     // Update scene record with the new image URL and set status to "complete"
      const { error: updateError } = await supabase
        .from("scenes")
        .update({
          image_url: imageUrl,
-         image_status: "done",
+          image_status: "done",
        })
        .eq("id", scene_id);
      
@@ -158,13 +192,22 @@
        JSON.stringify({
          success: true,
          image_url: imageUrl,
-         scene_id,
+         scene_id: scene_id,
        }),
        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
      );
    } catch (error) {
      console.error("Unexpected error:", error);
      const errorMessage = error instanceof Error ? error.message : "Unexpected error";
+     
+     // Set status to failed if we have a scene_id
+     if (sceneId) {
+       await supabase
+         .from("scenes")
+         .update({ image_status: "failed" })
+         .eq("id", sceneId);
+     }
+     
      return new Response(
        JSON.stringify({ error: errorMessage }),
        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
