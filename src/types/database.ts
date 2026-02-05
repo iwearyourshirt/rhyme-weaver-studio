@@ -26,6 +26,7 @@ export interface Character {
   description: string;
   reference_images: string[];
   primary_image_url: string | null;
+   character_type: 'character' | 'environment';
   created_at: string;
 }
 

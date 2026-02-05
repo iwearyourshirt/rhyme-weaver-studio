@@ -17,6 +17,7 @@ export function useCharacters(projectId: string | undefined) {
       return (data || []).map(char => ({
         ...char,
         reference_images: (char.reference_images as string[]) || [],
+         character_type: (char.character_type as 'character' | 'environment') || 'character',
       })) as Character[];
     },
     enabled: !!projectId,
@@ -75,6 +76,7 @@ export function useUpdateCharacter() {
         description: string;
         reference_images: string[];
         primary_image_url: string | null;
+         character_type: 'character' | 'environment';
       }>;
     }) => {
       const { data, error } = await supabase
@@ -88,6 +90,7 @@ export function useUpdateCharacter() {
       return {
         ...data,
         reference_images: (data.reference_images as string[]) || [],
+         character_type: (data.character_type as 'character' | 'environment') || 'character',
       } as Character;
     },
     onSuccess: (_, variables) => {
