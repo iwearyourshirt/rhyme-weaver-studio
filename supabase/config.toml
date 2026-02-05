@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.generate-storyboard]
 verify_jwt = false
+ 
+ [functions.generate-scene-image]
+ verify_jwt = false
