@@ -48,7 +48,7 @@ export function AppSidebar() {
   const isInProject = !!projectId;
 
   return (
-    <Sidebar className="border-r border-sidebar-border">
+    <Sidebar variant="overlay" className="border-r border-sidebar-border">
       <SidebarHeader className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
