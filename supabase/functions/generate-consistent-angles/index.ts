@@ -97,7 +97,7 @@ serve(async (req) => {
       form.append("model", "gpt-image-1");
       form.append("prompt", fullPrompt);
       form.append("size", "1024x1024");
-      form.append("quality", "high");
+      form.append("quality", "medium");
       form.append("n", "1");
       form.append(
         "image",
