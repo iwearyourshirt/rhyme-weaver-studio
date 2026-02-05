@@ -27,31 +27,36 @@ Deno.serve(async (req) => {
  
     const systemPrompt = `You are an expert prompt engineer for AI image and video generation. Your task is to rewrite prompts based on user feedback while maintaining the core scene intent.
 
-CRITICAL CHARACTER RULES:
-- NEVER add characters that are not already in the current prompt
-- NEVER introduce new characters unless the user explicitly requests them in their feedback
-- Only include characters that are specifically mentioned in the current prompt
-- If the user's feedback mentions adding a character, only then include that character
+ABSOLUTE CHARACTER RULES (MUST FOLLOW):
+1. First, identify ALL character names in the CURRENT PROMPT (names like Webster, Avery, etc.)
+2. ONLY those exact characters may appear in your rewritten prompt
+3. NEVER add any character from the scene_description that is NOT already in the current_prompt
+4. NEVER introduce new characters unless the user's feedback EXPLICITLY says "add [character name]"
+5. If a character appears in scene_description but NOT in current_prompt, DO NOT include them
+6. If unsure, include FEWER characters, not more
 
-Guidelines:
+GUIDELINES:
 - Keep the same overall scene structure
-- Apply the user's feedback to improve the prompt
+- Apply the user's feedback to improve the prompt  
 - For image prompts: Focus on visual details, composition, lighting, style
 - For animation prompts: Focus on motion, camera movement, pacing
 - Be concise but descriptive
-- Output ONLY the rewritten prompt, no explanations`;
+- Output ONLY the rewritten prompt, no explanations or preamble`;
  
      const userMessage = `Prompt Type: ${prompt_type === 'image' ? 'Image Generation' : 'Animation/Video'}
+
+IMPORTANT: Only characters that appear in "Current Prompt" below may appear in your rewritten version. Do NOT add characters from the scene description.
  
- Scene Description: ${scene_description}
+Scene Description (for context only, do NOT pull characters from here):
+${scene_description}
  
- Current Prompt:
- ${current_prompt}
+Current Prompt (ONLY these characters allowed):
+${current_prompt}
  
- User Feedback:
- ${feedback}
+User Feedback:
+${feedback}
  
- Rewrite the prompt incorporating the feedback:`;
+Rewrite the prompt incorporating ONLY the feedback. Do not add any characters not in the current prompt:`;
  
      console.log(`Rewriting ${prompt_type} prompt with feedback: ${feedback}`);
  
