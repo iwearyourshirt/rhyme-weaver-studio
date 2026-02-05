@@ -45,36 +45,30 @@ export function VideoSceneCard({
   const [editedPrompt, setEditedPrompt] = useState(scene.animation_prompt);
   const videoRef = useRef<HTMLVideoElement>(null);
   const startTimeRef = useRef<number | null>(null);
-  // Track if we initiated this generation in the current session
-  const initiatedThisSessionRef = useRef(false);
 
-  // Timer effect for generation progress - only tracks time if we initiated the generation
+  // Timer effect for generation progress - always show timer when generating
   useEffect(() => {
     const isActuallyGeneratingNow = scene.video_status === 'generating';
     
     if (isActuallyGeneratingNow) {
-      // Only start a fresh timer if we initiated this generation in this session
-      if (isGenerating && !startTimeRef.current) {
+      // Start timer if not already started
+      if (!startTimeRef.current) {
         startTimeRef.current = Date.now();
-        initiatedThisSessionRef.current = true;
       }
 
-      // Only run timer if we have a start time (meaning we initiated it)
-      if (startTimeRef.current) {
-        const interval = setInterval(() => {
-          const elapsed = Math.floor((Date.now() - startTimeRef.current!) / 1000);
-          setElapsedTime(elapsed);
-        }, 1000);
+      // Run timer
+      const interval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTimeRef.current!) / 1000);
+        setElapsedTime(elapsed);
+      }, 1000);
 
-        return () => clearInterval(interval);
-      }
+      return () => clearInterval(interval);
     } else {
       // Reset when done/failed
       startTimeRef.current = null;
-      initiatedThisSessionRef.current = false;
       setElapsedTime(0);
     }
-  }, [isGenerating, scene.video_status]);
+  }, [scene.video_status]);
 
   // Reset edited prompt when scene changes
   useEffect(() => {
@@ -184,11 +178,9 @@ export function VideoSceneCard({
               <p className="text-sm font-medium text-foreground mb-2">
                 {isCancelling ? 'Cancelling...' : 'Generating video...'}
               </p>
-              <Progress value={initiatedThisSessionRef.current ? progressPercent : 50} className="w-full max-w-[160px] h-2 mb-2" />
+              <Progress value={progressPercent} className="w-full max-w-[160px] h-2 mb-2" />
               <p className="text-xs text-muted-foreground mb-3 text-center">
-                {initiatedThisSessionRef.current 
-                  ? <><span className="font-medium">{elapsedTime}s</span> elapsed • {getTimeDisplay()}</>
-                  : 'Generation in progress...'}
+                <span className="font-medium">{elapsedTime}s</span> elapsed • {getTimeDisplay()}
               </p>
               {/* Cancel button */}
               <Button
