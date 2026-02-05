@@ -1,6 +1,6 @@
  import { useEffect, useState } from 'react';
  import { useParams, useNavigate } from 'react-router-dom';
- import { ArrowRight, Wand2, GripVertical, ChevronDown, ChevronUp, Scissors, Merge, Trash2, Save, Loader2, Clock, Film, RefreshCw, ImageIcon } from 'lucide-react';
+ import { ArrowRight, Wand2, GripVertical, ChevronDown, ChevronUp, Scissors, Merge, Trash2, Save, Loader2, Clock, Film, RefreshCw, ImageIcon, Plus } from 'lucide-react';
  import { Button } from '@/components/ui/button';
   import { Label } from '@/components/ui/label';
   import { PromptFeedback } from '@/components/storyboard/PromptFeedback';
@@ -281,16 +281,74 @@ import { useScenesRealtime } from '@/hooks/useScenesRealtime';
      } catch (error) {
        toast.error('Failed to combine scenes');
      }
-   };
- 
-   const handleContinue = async () => {
-     if (!projectId) return;
-     await updateProject.mutateAsync({
-       id: projectId,
-       updates: { status: 'images' },
-     });
-     navigate(`/project/${projectId}/images`);
-   };
+    };
+
+    const handleAddScene = async (position: 'above' | 'below', referenceScene: Scene) => {
+      if (!projectId || !scenes) return;
+
+      try {
+        const newSceneNumber = position === 'above' 
+          ? referenceScene.scene_number 
+          : referenceScene.scene_number + 1;
+
+        // Calculate timing - use a small duration around the reference point
+        const duration = 5; // 5 seconds default for new scene
+        let startTime: number;
+        let endTime: number;
+
+        if (position === 'above') {
+          // Insert before: take time from the start of reference scene
+          endTime = referenceScene.start_time;
+          startTime = Math.max(0, endTime - duration);
+        } else {
+          // Insert after: take time from the end of reference scene
+          startTime = referenceScene.end_time;
+          endTime = startTime + duration;
+        }
+
+        // Renumber scenes that come after the insertion point
+        const scenesToRenumber = scenes
+          .filter(s => s.scene_number >= newSceneNumber)
+          .map(s => ({ id: s.id, scene_number: s.scene_number + 1 }));
+
+        if (scenesToRenumber.length > 0) {
+          await renumberScenes.mutateAsync({ projectId, sceneUpdates: scenesToRenumber });
+        }
+
+        // Create the new scene
+        await createScene.mutateAsync({
+          project_id: projectId,
+          scene_number: newSceneNumber,
+          start_time: startTime,
+          end_time: endTime,
+          lyric_snippet: '',
+          scene_description: 'New scene - add description',
+          characters_in_scene: [],
+          image_prompt: '',
+          animation_prompt: '',
+          image_url: null,
+          image_status: 'pending',
+          image_approved: false,
+          video_url: null,
+          video_status: 'pending',
+          video_request_id: null,
+          video_error: null,
+        });
+
+        toast.success(`Scene added ${position} Scene ${referenceScene.scene_number}`);
+      } catch (error) {
+        toast.error('Failed to add scene');
+      }
+    };
+
+    const handleContinue = async () => {
+      if (!projectId) return;
+      await updateProject.mutateAsync({
+        id: projectId,
+        updates: { status: 'images' },
+      });
+      navigate(`/project/${projectId}/images`);
+    };
  
    const totalScenes = scenes?.length || 0;
    const totalDuration = scenes?.reduce((acc, s) => acc + (s.end_time - s.start_time), 0) || 0;
@@ -386,76 +444,99 @@ import { useScenesRealtime } from '@/hooks/useScenesRealtime';
          </Card>
        )}
  
-       {scenes && scenes.length > 0 ? (
-         <div className="space-y-4">
-           {scenes.map((scene) => (
-             <Card key={scene.id} className="card-shadow">
-               <CardHeader className="pb-2">
-                 <div className="flex items-center justify-between">
-                   <div className="flex items-center gap-3">
-                     <GripVertical className="h-5 w-5 text-muted-foreground" />
-                     <CardTitle className="text-base">
-                       Scene {scene.scene_number}: {formatTime(scene.start_time)} - {formatTime(scene.end_time)}
-                     </CardTitle>
-                   </div>
-                   <div className="flex items-center gap-1">
-                     <Button
-                       variant="ghost"
-                       size="sm"
-                       onClick={() => handleSplitScene(scene)}
-                       title="Split Scene"
-                     >
-                       <Scissors className="h-4 w-4" />
-                     </Button>
-                     {scenes.find(s => s.scene_number === scene.scene_number + 1) && (
-                       <Button
-                         variant="ghost"
-                         size="sm"
-                         onClick={() => handleCombineWithNext(scene)}
-                         title="Combine with Next"
-                       >
-                         <Merge className="h-4 w-4" />
-                       </Button>
-                     )}
-                     <AlertDialog>
-                       <AlertDialogTrigger asChild>
-                         <Button variant="ghost" size="sm" title="Delete Scene">
-                           <Trash2 className="h-4 w-4 text-destructive" />
-                         </Button>
-                       </AlertDialogTrigger>
-                       <AlertDialogContent>
-                         <AlertDialogHeader>
-                           <AlertDialogTitle>Delete Scene?</AlertDialogTitle>
-                           <AlertDialogDescription>
-                             This will permanently delete Scene {scene.scene_number}.
-                           </AlertDialogDescription>
-                         </AlertDialogHeader>
-                         <AlertDialogFooter>
-                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                           <AlertDialogAction
-                             onClick={() => handleDeleteScene(scene.id)}
-                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                           >
-                             Delete
-                           </AlertDialogAction>
-                         </AlertDialogFooter>
-                       </AlertDialogContent>
-                     </AlertDialog>
-                   </div>
-                 </div>
-                 <p className="text-sm text-muted-foreground italic ml-8">
-                   "{scene.lyric_snippet}"
-                 </p>
-               </CardHeader>
-               <CardContent className="space-y-4 pt-2">
-                 <div className="flex gap-4">
-                   <div className="w-24 h-24 flex-shrink-0 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center bg-muted/30">
-                     {scene.image_url ? (
-                       <img src={scene.image_url} alt={`Scene ${scene.scene_number}`} className="w-full h-full object-cover rounded-lg" />
-                     ) : (
-                       <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
-                     )}
-                   </div>
+        {scenes && scenes.length > 0 ? (
+          <div className="space-y-2">
+            {scenes.map((scene, index) => (
+              <div key={scene.id}>
+                {/* Add Scene Above button - only show for first scene */}
+                {index === 0 && (
+                  <div className="flex justify-center py-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAddScene('above', scene)}
+                      className="gap-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Scene Above
+                    </Button>
+                  </div>
+                )}
+
+                <Card className="card-shadow">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <GripVertical className="h-5 w-5 text-muted-foreground" />
+                        <CardTitle className="text-base">
+                          Scene {scene.scene_number}: {formatTime(scene.start_time)} - {formatTime(scene.end_time)}
+                        </CardTitle>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSplitScene(scene)}
+                          title="Split Scene"
+                        >
+                          <Scissors className="h-4 w-4" />
+                        </Button>
+                        {scenes.find(s => s.scene_number === scene.scene_number + 1) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCombineWithNext(scene)}
+                            title="Combine with Next"
+                          >
+                            <Merge className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" title="Delete Scene">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Scene?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete Scene {scene.scene_number}.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteScene(scene.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground italic ml-8">
+                      "{scene.lyric_snippet}"
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-4 pt-2">
+                    <div className="flex gap-4">
+                      <div className="w-24 h-24 flex-shrink-0 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center bg-muted/30 relative group">
+                        {scene.image_url ? (
+                          <img src={scene.image_url} alt={`Scene ${scene.scene_number}`} className="w-full h-full object-cover rounded-lg" />
+                        ) : (
+                          <button
+                            onClick={() => navigate(`/project/${projectId}/images`)}
+                            className="absolute inset-0 flex flex-col items-center justify-center gap-1 hover:bg-muted/50 rounded-lg transition-colors"
+                            title="Go to Image Generator"
+                          >
+                            <ImageIcon className="h-6 w-6 text-muted-foreground/50" />
+                            <span className="text-[10px] text-muted-foreground">Generate</span>
+                          </button>
+                        )}
+                      </div>
                    
                    <div className="space-y-2 flex-1">
                      <Label className="text-xs text-muted-foreground">Scene Description</Label>
@@ -545,10 +626,24 @@ import { useScenesRealtime } from '@/hooks/useScenesRealtime';
                      </Button>
                    </div>
                  )}
-               </CardContent>
-             </Card>
-           ))}
-         </div>
+                </CardContent>
+              </Card>
+
+              {/* Add Scene Below button */}
+              <div className="flex justify-center py-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleAddScene('below', scene)}
+                  className="gap-1 text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Scene Below
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
        ) : (
          <Card className="card-shadow">
            <CardContent className="flex flex-col items-center justify-center py-16">
