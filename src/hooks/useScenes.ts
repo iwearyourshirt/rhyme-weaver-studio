@@ -19,6 +19,7 @@ export function useScenes(projectId: string | undefined) {
         start_time: Number(scene.start_time),
         end_time: Number(scene.end_time),
         characters_in_scene: (scene.characters_in_scene as string[]) || [],
+        image_approved: scene.image_approved ?? false,
       })) as Scene[];
     },
     enabled: !!projectId,
@@ -68,12 +69,13 @@ export function useUpdateScene() {
         animation_prompt: string;
         image_url: string | null;
         image_status: GenerationStatus;
+        image_approved: boolean;
         video_url: string | null;
         video_status: GenerationStatus;
-      scene_number: number;
-      start_time: number;
-      end_time: number;
-      lyric_snippet: string;
+        scene_number: number;
+        start_time: number;
+        end_time: number;
+        lyric_snippet: string;
       }>;
     }) => {
       const { data, error } = await supabase

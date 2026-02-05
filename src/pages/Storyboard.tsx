@@ -209,21 +209,22 @@
          updates: { end_time: midTime },
        });
        
-       await createScene.mutateAsync({
-         project_id: projectId,
-         scene_number: scene.scene_number + 1,
-         start_time: midTime,
-         end_time: scene.end_time,
-         lyric_snippet: scene.lyric_snippet,
-         scene_description: scene.scene_description,
-         characters_in_scene: scene.characters_in_scene,
-         image_prompt: scene.image_prompt,
-         animation_prompt: scene.animation_prompt,
-         image_url: null,
-         image_status: 'pending',
-         video_url: null,
-         video_status: 'pending',
-       });
+        await createScene.mutateAsync({
+          project_id: projectId,
+          scene_number: scene.scene_number + 1,
+          start_time: midTime,
+          end_time: scene.end_time,
+          lyric_snippet: scene.lyric_snippet,
+          scene_description: scene.scene_description,
+          characters_in_scene: scene.characters_in_scene,
+          image_prompt: scene.image_prompt,
+          animation_prompt: scene.animation_prompt,
+          image_url: null,
+          image_status: 'pending',
+          image_approved: false,
+          video_url: null,
+          video_status: 'pending',
+        });
        
        const scenesAfter = scenes
          .filter(s => s.scene_number > scene.scene_number)

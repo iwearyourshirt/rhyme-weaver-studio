@@ -43,6 +43,7 @@ export interface Scene {
   animation_prompt: string;
   image_url: string | null;
   image_status: GenerationStatus;
+  image_approved: boolean;
   video_url: string | null;
   video_status: GenerationStatus;
   created_at: string;
