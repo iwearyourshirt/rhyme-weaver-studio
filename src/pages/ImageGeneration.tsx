@@ -9,6 +9,7 @@ import { useProject, useUpdateProject } from '@/hooks/useProjects';
 import { useScenes, useUpdateScene } from '@/hooks/useScenes';
 import { useDebug } from '@/contexts/DebugContext';
 import { toast } from 'sonner';
+ import { supabase } from '@/integrations/supabase/client';
 
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
@@ -45,25 +46,44 @@ export default function ImageGeneration() {
       updates: { image_status: 'generating' },
     });
 
-    // Placeholder - will connect to fal.ai later
-    await new Promise((resolve) => setTimeout(resolve, 2000 + Math.random() * 1000));
-
-    const mockImageUrl = `https://images.unsplash.com/photo-${Date.now()}?w=512&h=512&fit=crop&auto=format`;
-    const placeholderImages = [
-      'https://images.unsplash.com/photo-1472289065668-ce650ac443d2?w=512&h=512&fit=crop',
-      'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=512&h=512&fit=crop',
-      'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=512&h=512&fit=crop',
-      'https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=512&h=512&fit=crop',
-    ];
-    const randomImage = placeholderImages[Math.floor(Math.random() * placeholderImages.length)];
-
-    await updateScene.mutateAsync({
-      id: sceneId,
-      projectId: projectId!,
-      updates: { image_status: 'done', image_url: randomImage },
-    });
-
-    logApiCall('Generate Image', { sceneId }, { image_url: randomImage });
+     try {
+       const requestPayload = { scene_id: sceneId, project_id: projectId };
+       
+       const { data, error } = await supabase.functions.invoke('generate-scene-image', {
+         body: requestPayload,
+       });
+       
+       if (error) {
+         console.error('Edge function error:', error);
+         await updateScene.mutateAsync({
+           id: sceneId,
+           projectId: projectId!,
+           updates: { image_status: 'failed' },
+         });
+         logApiCall('Generate Scene Image', requestPayload, { error: error.message });
+         toast.error(`Failed to generate image: ${error.message}`);
+         setGeneratingIds((prev) => {
+           const next = new Set(prev);
+           next.delete(sceneId);
+           return next;
+         });
+         return;
+       }
+       
+       logApiCall('Generate Scene Image', requestPayload, data);
+       
+       // The edge function already updates the scene, but we refetch via the hook
+       // Just remove from generating set - the query will refetch
+     } catch (err) {
+       console.error('Unexpected error:', err);
+       await updateScene.mutateAsync({
+         id: sceneId,
+         projectId: projectId!,
+         updates: { image_status: 'failed' },
+       });
+       toast.error('An unexpected error occurred');
+     }
+ 
     setGeneratingIds((prev) => {
       const next = new Set(prev);
       next.delete(sceneId);
@@ -135,13 +155,13 @@ export default function ImageGeneration() {
       </div>
 
       {scenes && scenes.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {scenes.map((scene) => (
             <Card
               key={scene.id}
               className="card-shadow overflow-hidden group"
             >
-              <div className="aspect-square bg-muted relative">
+               <div className="aspect-[3/2] bg-muted relative">
                 {scene.image_url ? (
                   <img
                     src={scene.image_url}
