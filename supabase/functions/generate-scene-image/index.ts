@@ -15,9 +15,10 @@
  }
  
  interface ReferenceImage {
-   type: "base64";
-   media_type: string;
-   data: string;
+   type: "image_url";
+   image_url: {
+     url: string; // data:image/png;base64,... format
+   };
  }
  
  async function downloadImageAsBase64(url: string): Promise<{ base64: string; mimeType: string } | null> {
@@ -158,9 +159,10 @@
        
        if (imageData) {
          referenceImages.push({
-           type: "base64",
-           media_type: imageData.mimeType,
-           data: imageData.base64,
+           type: "image_url",
+           image_url: {
+             url: `data:${imageData.mimeType};base64,${imageData.base64}`,
+           },
          });
          includedCharacters.push(char.name);
          
@@ -204,28 +206,38 @@
      
      console.log(`Final prompt: ${finalPrompt}`);
      
-     // Build the request body
-     const requestBody: Record<string, unknown> = {
-       model: "gpt-image-1",
-       prompt: finalPrompt,
-       size: "1536x1024",
-       quality: "medium",
-       n: 1,
-     };
+     // Build the message content for multimodal input
+     const messageContent: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
+       {
+         type: "text",
+         text: finalPrompt,
+       },
+     ];
      
-     // Add reference images if we have any
-     if (referenceImages.length > 0) {
-       requestBody.image = referenceImages;
+     // Add reference images to the message content
+     for (const refImage of referenceImages) {
+       messageContent.push(refImage);
      }
      
-     // Call OpenAI API to generate the image
-     const openaiResponse = await fetch("https://api.openai.com/v1/images/generations", {
+     console.log(`Sending ${messageContent.length} content items (1 text + ${referenceImages.length} images)`);
+     
+     // Use chat completions endpoint with gpt-image-1 for multimodal image generation
+     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
        method: "POST",
        headers: {
          "Authorization": `Bearer ${openaiApiKey}`,
          "Content-Type": "application/json",
        },
-       body: JSON.stringify(requestBody),
+       body: JSON.stringify({
+         model: "gpt-image-1",
+         messages: [
+           {
+             role: "user",
+             content: messageContent,
+           },
+         ],
+         modalities: ["image", "text"],
+       }),
      });
      
      if (!openaiResponse.ok) {
@@ -247,23 +259,11 @@
      const openaiData = await openaiResponse.json();
      console.log("OpenAI response received");
      
-     // The response contains base64 encoded image data
-     const imageData = openaiData.data[0];
-     let imageBytes: Uint8Array;
-     
-     if (imageData.b64_json) {
-       // Decode base64 image
-       const binaryString = atob(imageData.b64_json);
-       imageBytes = new Uint8Array(binaryString.length);
-       for (let i = 0; i < binaryString.length; i++) {
-         imageBytes[i] = binaryString.charCodeAt(i);
-       }
-     } else if (imageData.url) {
-       // Download from URL if provided
-       const imageResponse = await fetch(imageData.url);
-       imageBytes = new Uint8Array(await imageResponse.arrayBuffer());
-     } else {
-       console.error("No image data in response");
+     // Extract image from chat completion response
+     // The response structure is: choices[0].message.images[0].image_url.url (base64 data URL)
+     const choice = openaiData.choices?.[0];
+     if (!choice?.message?.images?.length) {
+       console.error("No images in response:", JSON.stringify(openaiData));
        
        // Set status to failed
        await supabase
@@ -272,7 +272,56 @@
          .eq("id", scene_id);
        
        return new Response(
-         JSON.stringify({ error: "No image data in OpenAI response" }),
+         JSON.stringify({ error: "No image in OpenAI response", details: JSON.stringify(openaiData) }),
+         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+       );
+     }
+     
+     const generatedImage = choice.message.images[0];
+     const imageDataUrl = generatedImage.image_url?.url;
+     
+     if (!imageDataUrl) {
+       console.error("No image URL in response");
+       
+       // Set status to failed
+       await supabase
+         .from("scenes")
+         .update({ image_status: "failed" })
+         .eq("id", scene_id);
+       
+       return new Response(
+         JSON.stringify({ error: "No image URL in OpenAI response" }),
+         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+       );
+     }
+     
+     // Parse the data URL to extract base64 content
+     // Format: data:image/png;base64,iVBORw0KGgo...
+     let imageBytes: Uint8Array;
+     
+     if (imageDataUrl.startsWith("data:")) {
+       const base64Data = imageDataUrl.split(",")[1];
+       // Decode base64 image
+       const binaryString = atob(base64Data);
+       imageBytes = new Uint8Array(binaryString.length);
+       for (let i = 0; i < binaryString.length; i++) {
+         imageBytes[i] = binaryString.charCodeAt(i);
+       }
+     } else if (imageDataUrl.startsWith("http")) {
+       // Download from URL if provided
+       const imageResponse = await fetch(imageDataUrl);
+       imageBytes = new Uint8Array(await imageResponse.arrayBuffer());
+     } else {
+       console.error("Unrecognized image URL format:", imageDataUrl.substring(0, 50));
+       
+       // Set status to failed
+       await supabase
+         .from("scenes")
+         .update({ image_status: "failed" })
+         .eq("id", scene_id);
+       
+       return new Response(
+         JSON.stringify({ error: "Unrecognized image URL format in OpenAI response" }),
          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
        );
      }
