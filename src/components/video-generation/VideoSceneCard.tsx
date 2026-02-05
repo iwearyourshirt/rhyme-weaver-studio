@@ -143,7 +143,7 @@ export function VideoSceneCard({
   };
 
   return (
-    <Card className="card-shadow overflow-hidden group">
+    <Card className="border overflow-hidden group">
       {/* Horizontal layout for smaller screens, vertical for larger */}
       <div className="flex flex-row lg:flex-col">
         {/* Video/Image section - 2/3 width on small screens, full width on large */}
@@ -185,14 +185,14 @@ export function VideoSceneCard({
 
           {/* Generating overlay */}
           {isActuallyGenerating && (
-            <div className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center p-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mb-3" />
-              <p className="text-sm font-medium text-foreground mb-2">
+            <div className="absolute inset-0 bg-background/95 flex flex-col items-center justify-center p-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-foreground border-t-transparent mb-3" />
+              <p className="text-xs font-medium text-foreground mb-2">
                 {isCancelling ? 'Cancelling...' : 'Generating video...'}
               </p>
-              <Progress value={progressPercent} className="w-full max-w-[160px] h-2 mb-2" />
-              <p className="text-xs text-muted-foreground mb-3 text-center">
-                <span className="font-medium">{elapsedTime}s</span> elapsed • {getTimeDisplay()}
+              <Progress value={progressPercent} className="w-full max-w-[140px] h-1.5 mb-2" />
+              <p className="text-xs text-muted-foreground mb-3 text-center font-mono">
+                <span className="font-medium">{elapsedTime}s</span> • {getTimeDisplay()}
               </p>
               {/* Cancel button */}
               <Button

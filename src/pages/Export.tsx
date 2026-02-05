@@ -46,52 +46,51 @@ export default function Export() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
+    <div className="max-w-3xl mx-auto animate-fade-in space-y-8">
       <div>
-        <h1 className="text-3xl font-display font-bold text-foreground">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           Export
         </h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Download your video clips and audio
         </p>
       </div>
 
-      <Card className="card-shadow border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-        <CardContent className="py-6">
+      <Card className="border border-primary/20 bg-primary/5">
+        <CardContent className="py-5">
           <div className="flex items-start gap-4">
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <ExternalLink className="h-6 w-6 text-primary" />
+            <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <ExternalLink className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h3 className="font-medium text-foreground mb-1">
+              <h3 className="text-sm font-medium text-foreground mb-1">
                 Ready to Assemble
               </h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Import these clips and audio into Descript, CapCut, or your preferred
-                video editor to assemble the final video. The clips are already in
-                order and match the timestamps of your audio.
+                video editor. The clips are already in order.
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="card-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Video className="h-5 w-5" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <Card className="border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              <Video className="h-4 w-4" />
               Video Clips
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="max-h-64 overflow-y-auto space-y-2">
+            <div className="max-h-56 overflow-y-auto space-y-2">
               {scenes?.map((scene) => (
                 <div
                   key={scene.id}
-                  className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
+                  className="flex items-center gap-3 p-2 rounded-md bg-muted/50"
                 >
-                  <div className="w-16 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
+                  <div className="w-14 h-9 rounded overflow-hidden bg-muted flex-shrink-0">
                     {scene.image_url && (
                       <img
                         src={scene.image_url}
@@ -104,12 +103,12 @@ export default function Export() {
                     <p className="text-sm font-medium truncate">
                       Scene {scene.scene_number}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground font-mono">
                       {formatTime(scene.start_time)} - {formatTime(scene.end_time)}
                     </p>
                   </div>
                   {scene.video_status === 'done' && (
-                    <div className="h-2 w-2 rounded-full bg-success" />
+                    <div className="h-2 w-2 rounded-full bg-primary" />
                   )}
                 </div>
               ))}
@@ -121,10 +120,10 @@ export default function Export() {
           </CardContent>
         </Card>
 
-        <Card className="card-shadow">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Music className="h-5 w-5" />
+        <Card className="border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              <Music className="h-4 w-4" />
               Audio Track
             </CardTitle>
           </CardHeader>
@@ -154,37 +153,37 @@ export default function Export() {
         </Card>
       </div>
 
-      <Card className="card-shadow">
-        <CardHeader>
-          <CardTitle>Project Summary</CardTitle>
+      <Card className="border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium">Project Summary</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div className="p-4 rounded-lg bg-muted/50">
-              <p className="text-2xl font-bold text-foreground">
+            <div className="p-4 rounded-md bg-muted/50">
+              <p className="text-2xl font-semibold text-foreground font-mono">
                 {scenes?.length || 0}
               </p>
-              <p className="text-sm text-muted-foreground">Scenes</p>
+              <p className="text-xs text-muted-foreground mt-1">Scenes</p>
             </div>
-            <div className="p-4 rounded-lg bg-muted/50">
-              <p className="text-2xl font-bold text-foreground">
+            <div className="p-4 rounded-md bg-muted/50">
+              <p className="text-2xl font-semibold text-foreground font-mono">
                 {scenes?.filter((s) => s.image_status === 'done').length || 0}
               </p>
-              <p className="text-sm text-muted-foreground">Images</p>
+              <p className="text-xs text-muted-foreground mt-1">Images</p>
             </div>
-            <div className="p-4 rounded-lg bg-muted/50">
-              <p className="text-2xl font-bold text-foreground">
+            <div className="p-4 rounded-md bg-muted/50">
+              <p className="text-2xl font-semibold text-foreground font-mono">
                 {scenes?.filter((s) => s.video_status === 'done').length || 0}
               </p>
-              <p className="text-sm text-muted-foreground">Videos</p>
+              <p className="text-xs text-muted-foreground mt-1">Videos</p>
             </div>
-            <div className="p-4 rounded-lg bg-muted/50">
-              <p className="text-2xl font-bold text-foreground">
+            <div className="p-4 rounded-md bg-muted/50">
+              <p className="text-2xl font-semibold text-foreground font-mono">
                 {scenes?.length
                   ? formatTime(scenes[scenes.length - 1]?.end_time || 0)
                   : '0:00'}
               </p>
-              <p className="text-sm text-muted-foreground">Duration</p>
+              <p className="text-xs text-muted-foreground mt-1">Duration</p>
             </div>
           </div>
         </CardContent>
