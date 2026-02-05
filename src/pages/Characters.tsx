@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, ArrowRight, Star, Trash2, Wand2, Loader2, RefreshCw, ZoomIn, RotateCcw, X } from 'lucide-react';
+import { Plus, ArrowRight, Star, Trash2, Wand2, Loader2, RefreshCw, ZoomIn, RotateCcw, X, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,6 +60,7 @@ export default function Characters() {
   const [generatingCharId, setGeneratingCharId] = useState<string | null>(null);
   const [generatingAnglesCharId, setGeneratingAnglesCharId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
+  const [editingCharacter, setEditingCharacter] = useState<{ id: string; name: string; description: string } | null>(null);
 
   useEffect(() => {
     setCurrentPage('Characters');
@@ -235,6 +236,25 @@ export default function Characters() {
     setPreviewImage({ url, characterId, characterName, isPrimary });
   };
 
+  const handleUpdateDescription = async () => {
+    if (!editingCharacter || !projectId) return;
+    
+    try {
+      await updateCharacter.mutateAsync({
+        id: editingCharacter.id,
+        projectId,
+        updates: { 
+          name: editingCharacter.name,
+          description: editingCharacter.description 
+        },
+      });
+      setEditingCharacter(null);
+      toast.success('Character updated!');
+    } catch (error) {
+      toast.error('Failed to update character');
+    }
+  };
+
   const handleContinue = async () => {
     if (!projectId) return;
     await updateProject.mutateAsync({
@@ -340,12 +360,25 @@ export default function Characters() {
             <Card key={character.id} className="card-shadow group">
               <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <CardTitle className="text-lg">{character.name}</CardTitle>
-                <AlertDialog>
+                <div className="flex gap-1 -mt-1 -mr-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => setEditingCharacter({
+                      id: character.id,
+                      name: character.name,
+                      description: character.description,
+                    })}
+                  >
+                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                  <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity -mt-1 -mr-2"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -373,6 +406,7 @@ export default function Characters() {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground line-clamp-2">
@@ -489,6 +523,42 @@ export default function Characters() {
       </div>
 
       {/* Image Preview Dialog */}
+      
+      {/* Edit Character Dialog */}
+      <Dialog open={!!editingCharacter} onOpenChange={(open) => !open && setEditingCharacter(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Character</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-char-name">Character Name</Label>
+              <Input
+                id="edit-char-name"
+                value={editingCharacter?.name || ''}
+                onChange={(e) => setEditingCharacter(prev => prev ? { ...prev, name: e.target.value } : null)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-char-desc">Description</Label>
+              <Textarea
+                id="edit-char-desc"
+                value={editingCharacter?.description || ''}
+                onChange={(e) => setEditingCharacter(prev => prev ? { ...prev, description: e.target.value } : null)}
+                className="min-h-[120px]"
+              />
+            </div>
+            <Button
+              onClick={handleUpdateDescription}
+              disabled={updateCharacter.isPending}
+              className="w-full"
+            >
+              {updateCharacter.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!previewImage} onOpenChange={(open) => !open && setPreviewImage(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
