@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -13,7 +13,9 @@ interface VideoSceneCardProps {
   scene: Scene;
   projectId: string;
   isGenerating: boolean;
+  isCancelling?: boolean;
   onGenerate: () => void;
+  onCancel: () => void;
   onUpdatePrompt: (prompt: string) => Promise<void>;
 }
 
@@ -30,7 +32,9 @@ export function VideoSceneCard({
   scene,
   projectId,
   isGenerating,
+  isCancelling = false,
   onGenerate,
+  onCancel,
   onUpdatePrompt,
 }: VideoSceneCardProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -163,13 +167,26 @@ export function VideoSceneCard({
           {isActuallyGenerating && (
             <div className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center p-4">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mb-3" />
-              <p className="text-sm font-medium text-foreground mb-2">Generating video...</p>
+              <p className="text-sm font-medium text-foreground mb-2">
+                {isCancelling ? 'Cancelling...' : 'Generating video...'}
+              </p>
               <Progress value={initiatedThisSessionRef.current ? progressPercent : 50} className="w-full max-w-[120px] h-1.5 mb-2" />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mb-3">
                 {initiatedThisSessionRef.current 
                   ? `${formatElapsed(elapsedTime)} elapsed • ${getEstimatedRemaining()}`
                   : 'Generation in progress...'}
               </p>
+              {/* Cancel button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onCancel}
+                disabled={isCancelling}
+                className="gap-1.5 text-xs h-7 bg-background/80"
+              >
+                <X className="h-3 w-3" />
+                {isCancelling ? 'Cancelling...' : 'Cancel'}
+              </Button>
             </div>
           )}
 
