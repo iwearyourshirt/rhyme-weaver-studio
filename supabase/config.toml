@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.poll-video-status]
 verify_jwt = false
+
+[functions.cancel-video-generation]
+verify_jwt = false
