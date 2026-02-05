@@ -39,22 +39,33 @@ export function VideoSceneCard({
   const [editedPrompt, setEditedPrompt] = useState(scene.animation_prompt);
   const videoRef = useRef<HTMLVideoElement>(null);
   const startTimeRef = useRef<number | null>(null);
+  // Track if we initiated this generation in the current session
+  const initiatedThisSessionRef = useRef(false);
 
-  // Timer effect for generation progress
+  // Timer effect for generation progress - only tracks time if we initiated the generation
   useEffect(() => {
-    if (isGenerating || scene.video_status === 'generating') {
-      if (!startTimeRef.current) {
+    const isActuallyGeneratingNow = scene.video_status === 'generating';
+    
+    if (isActuallyGeneratingNow) {
+      // Only start a fresh timer if we initiated this generation in this session
+      if (isGenerating && !startTimeRef.current) {
         startTimeRef.current = Date.now();
+        initiatedThisSessionRef.current = true;
       }
 
-      const interval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTimeRef.current!) / 1000);
-        setElapsedTime(elapsed);
-      }, 1000);
+      // Only run timer if we have a start time (meaning we initiated it)
+      if (startTimeRef.current) {
+        const interval = setInterval(() => {
+          const elapsed = Math.floor((Date.now() - startTimeRef.current!) / 1000);
+          setElapsedTime(elapsed);
+        }, 1000);
 
-      return () => clearInterval(interval);
+        return () => clearInterval(interval);
+      }
     } else {
+      // Reset when done/failed
       startTimeRef.current = null;
+      initiatedThisSessionRef.current = false;
       setElapsedTime(0);
     }
   }, [isGenerating, scene.video_status]);
@@ -150,9 +161,11 @@ export function VideoSceneCard({
           <div className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center p-4">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mb-3" />
             <p className="text-sm font-medium text-foreground mb-2">Generating video...</p>
-            <Progress value={progressPercent} className="w-full max-w-[120px] h-1.5 mb-2" />
+            <Progress value={initiatedThisSessionRef.current ? progressPercent : 50} className="w-full max-w-[120px] h-1.5 mb-2" />
             <p className="text-xs text-muted-foreground">
-              {formatElapsed(elapsedTime)} elapsed • {getEstimatedRemaining()}
+              {initiatedThisSessionRef.current 
+                ? `${formatElapsed(elapsedTime)} elapsed • ${getEstimatedRemaining()}`
+                : 'Generation in progress...'}
             </p>
           </div>
         )}
