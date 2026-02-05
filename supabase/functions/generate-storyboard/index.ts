@@ -23,14 +23,27 @@
  
 interface GeneratedScene {
   scene_number: number;
-  start_time: number;
-  end_time: number;
+  start_time: number | string;
+  end_time: number | string;
   lyric_snippet: string;
   scene_description: string;
   characters_in_scene: string[];
   shot_type: string;
   image_prompt: string;
   animation_prompt: string;
+}
+
+// Helper to parse timestamps that may come as "9.86s" or 9.86
+function parseTimestamp(value: number | string): number {
+  if (typeof value === "number") return value;
+  // Remove "s" suffix and parse
+  const cleaned = String(value).replace(/s$/i, "").trim();
+  const parsed = parseFloat(cleaned);
+  if (isNaN(parsed)) {
+    console.warn(`Invalid timestamp value: ${value}, defaulting to 0`);
+    return 0;
+  }
+  return parsed;
 }
  
 interface OpenAIResponse {
@@ -292,12 +305,12 @@ Return the result as a JSON object with a single key "scenes" containing an arra
        console.error("Error deleting existing scenes:", deleteError);
      }
  
-      // Insert new scenes
+      // Insert new scenes - parse timestamps to handle "9.86s" format
       const scenesToInsert = generatedScenes.map((scene) => ({
         project_id,
         scene_number: scene.scene_number,
-        start_time: scene.start_time,
-        end_time: scene.end_time,
+        start_time: parseTimestamp(scene.start_time),
+        end_time: parseTimestamp(scene.end_time),
         lyric_snippet: scene.lyric_snippet,
         scene_description: scene.scene_description,
         characters_in_scene: scene.characters_in_scene,
