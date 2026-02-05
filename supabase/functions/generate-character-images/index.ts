@@ -89,7 +89,6 @@ interface OpenAIImageResponse {
           size: "1024x1024",
           quality: "high",
           n: 1,
-          response_format: "b64_json",
          }),
        });
  
