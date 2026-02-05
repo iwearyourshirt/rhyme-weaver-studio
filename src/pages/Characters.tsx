@@ -61,6 +61,7 @@ export default function Characters() {
   const [generatingAnglesCharId, setGeneratingAnglesCharId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const [editingCharacter, setEditingCharacter] = useState<{ id: string; name: string; description: string } | null>(null);
+  const [deletingImage, setDeletingImage] = useState<{ characterId: string; imageUrl: string } | null>(null);
 
   useEffect(() => {
     setCurrentPage('Characters');
@@ -257,6 +258,35 @@ export default function Characters() {
     }
   };
 
+  const handleRemoveImage = async (characterId: string, imageUrl: string) => {
+    const character = characters?.find((c) => c.id === characterId);
+    if (!character) return;
+
+    try {
+      const updatedImages = character.reference_images.filter((img) => img !== imageUrl);
+      const updates: { reference_images: string[]; primary_image_url?: string | null } = {
+        reference_images: updatedImages,
+      };
+
+      // If we're removing the primary image, set a new one or null
+      if (character.primary_image_url === imageUrl) {
+        updates.primary_image_url = updatedImages[0] || null;
+      }
+
+      await updateCharacter.mutateAsync({
+        id: characterId,
+        projectId: projectId!,
+        updates,
+      });
+
+      setDeletingImage(null);
+      setPreviewImage(null);
+      toast.success('Image removed');
+    } catch (error) {
+      toast.error('Failed to remove image');
+    }
+  };
+
   const handleContinue = async () => {
     if (!projectId) return;
     await updateProject.mutateAsync({
@@ -439,7 +469,7 @@ export default function Characters() {
                             </div>
                           )}
                           {/* Hover overlay with zoom button */}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center">
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center gap-1">
                             <Button
                               size="sm"
                               variant="secondary"
@@ -453,6 +483,17 @@ export default function Characters() {
                             >
                               <ZoomIn className="h-3 w-3" />
                               View
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="gap-1"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingImage({ characterId: character.id, imageUrl: img });
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
                         </div>
@@ -591,6 +632,19 @@ export default function Characters() {
           </div>
           
           <div className="flex justify-end gap-2">
+            {previewImage && (
+              <Button 
+                variant="destructive" 
+                onClick={() => setDeletingImage({ 
+                  characterId: previewImage.characterId, 
+                  imageUrl: previewImage.url 
+                })}
+                className="gap-2 mr-auto"
+              >
+                <Trash2 className="h-4 w-4" />
+                Remove Image
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setPreviewImage(null)}>
               Close
             </Button>
@@ -606,6 +660,27 @@ export default function Characters() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Image Confirmation */}
+      <AlertDialog open={!!deletingImage} onOpenChange={(open) => !open && setDeletingImage(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Image?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove this image from the character's reference images. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingImage && handleRemoveImage(deletingImage.characterId, deletingImage.imageUrl)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
