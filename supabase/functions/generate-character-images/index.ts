@@ -5,7 +5,7 @@
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
  };
  
-const FELTED_STYLE_PREFIX = `Needle-felted wool doll photographed with macro lens. Tiny handmade wool figure with rough matte felted texture showing individual poked wool fibers. Very simple face with only tiny black bead eyes and a barely visible small smile, no rosy cheeks, no eyelashes, no face paint. Chunky stubby proportions like a toddler toy. Hair made of thick clumps of wool fiber, not individual strands. Clean simple soft-focus green or neutral background with no props or objects. Natural daylight, shallow depth of field.`;
+const FELTED_STYLE_PREFIX = `Needle-felted wool doll photographed with macro lens. Tiny handmade wool figure with rough matte felted texture showing individual poked wool fibers. Expressive face with wool fiber eyebrows, dark glossy eyes set close together, a small rounded wool nose, and a warm wide smile. The face has character and personality like a felt version of a real person, not a blank simple doll. Chunky stubby proportions like a toddler toy. Hair made of thick clumps of wool fiber. Clean simple soft-focus green or neutral background with no props or objects. Natural daylight, shallow depth of field.`;
  
  const POSE_SUFFIXES = [
   "Front view of the felted doll, full body visible, standing on felted wool grass.",
