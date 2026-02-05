@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowRight, Wand2, RefreshCw, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,26 +26,56 @@ export default function ImageGeneration() {
   const updateProject = useUpdateProject();
   const { setCurrentPage, setProjectData, logApiCall } = useDebug();
 
-  const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
    const [generatingAll, setGeneratingAll] = useState(false);
+   const toastShownRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => {
-    setCurrentPage('Image Generation');
-    setProjectData({ project, scenes });
-  }, [setCurrentPage, setProjectData, project, scenes]);
+   useEffect(() => {
+     setCurrentPage('Image Generation');
+     setProjectData({ project, scenes });
+   }, [setCurrentPage, setProjectData, project, scenes]);
+ 
+   // Watch for scene status changes to show toast and clear generating state
+   useEffect(() => {
+     if (!scenes) return;
+ 
+     scenes.forEach((scene) => {
+       // If scene is now done and we were generating it
+       if (scene.image_status === 'done' && generatingIds.has(scene.id)) {
+         // Only show toast once per scene completion
+         if (!toastShownRef.current.has(scene.id)) {
+           toastShownRef.current.add(scene.id);
+           toast.success(`Scene ${scene.scene_number} image generated`);
+         }
+         // Clear from generating set
+         setGeneratingIds((prev) => {
+           const next = new Set(prev);
+           next.delete(scene.id);
+           return next;
+         });
+       }
+     });
+   }, [scenes, generatingIds]);
+ 
+   // Reset toast tracking when starting new generations
+   const clearToastTracking = useCallback((sceneId: string) => {
+     toastShownRef.current.delete(sceneId);
+   }, []);
 
    const doneCount = scenes?.filter((s) => s.image_status === 'done').length || 0;
   const totalCount = scenes?.length || 0;
    const allDone = doneCount === totalCount && totalCount > 0;
 
-  const generateImage = async (sceneId: string) => {
-    setGeneratingIds((prev) => new Set(prev).add(sceneId));
-
+   const generateImage = async (sceneId: string) => {
+     // Clear any previous toast tracking for this scene
+     clearToastTracking(sceneId);
+     setGeneratingIds((prev) => new Set(prev).add(sceneId));
+ 
      try {
-        const requestPayload = { scene_id: sceneId };
-        
-        // Log the request to debug panel
-        console.log('Generating scene image:', requestPayload);
+       const requestPayload = { scene_id: sceneId };
+       
+       // Log the request to debug panel
+       console.log('Generating scene image:', requestPayload);
        
        const { data, error } = await supabase.functions.invoke('generate-scene-image', {
          body: requestPayload,
@@ -55,21 +85,27 @@ export default function ImageGeneration() {
          console.error('Edge function error:', error);
          logApiCall('Generate Scene Image', requestPayload, { error: error.message });
          toast.error(`Failed to generate image: ${error.message}`);
-        } else {
-          logApiCall('Generate Scene Image', requestPayload, data);
-          toast.success(`Scene image generated successfully`);
+         // Only clear generating on error - success is handled by the effect watching scene status
+         setGeneratingIds((prev) => {
+           const next = new Set(prev);
+           next.delete(sceneId);
+           return next;
+         });
+       } else {
+         logApiCall('Generate Scene Image', requestPayload, data);
+         // Don't show success toast here - wait for database to confirm completion
+         // The useEffect watching scenes will handle the toast when image_status becomes 'done'
        }
      } catch (err) {
        console.error('Unexpected error:', err);
        toast.error('An unexpected error occurred');
+       setGeneratingIds((prev) => {
+         const next = new Set(prev);
+         next.delete(sceneId);
+         return next;
+       });
      }
- 
-    setGeneratingIds((prev) => {
-      const next = new Set(prev);
-      next.delete(sceneId);
-      return next;
-    });
-  };
+   };
 
   const handleGenerateAll = async () => {
     if (!scenes) return;
@@ -86,7 +122,7 @@ export default function ImageGeneration() {
     }
 
      setGeneratingAll(false);
-    toast.success('All images generated!');
+     // Don't show "all done" toast here - individual scene toasts handle success
   };
 
   const handleContinue = async () => {
