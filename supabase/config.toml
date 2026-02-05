@@ -1,1 +1,7 @@
-project_id = "dfjoqvqkmdmotoubyecm"
+ project_id = "dfjoqvqkmdmotoubyecm"
+ 
+ [functions.transcribe-audio]
+ verify_jwt = false
+ 
+ [functions.generate-character-images]
+ verify_jwt = false

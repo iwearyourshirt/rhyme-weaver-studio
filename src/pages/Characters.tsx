@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, ArrowRight, Star, Trash2, Wand2 } from 'lucide-react';
+import { Plus, ArrowRight, Star, Trash2, Wand2, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,7 +49,7 @@ export default function Characters() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newCharName, setNewCharName] = useState('');
   const [newCharDesc, setNewCharDesc] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingCharId, setGeneratingCharId] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentPage('Characters');
@@ -75,25 +75,61 @@ export default function Characters() {
   };
 
   const handleGenerateImages = async (characterId: string) => {
-    setIsGenerating(true);
-    // Placeholder - will connect to fal.ai later
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const character = characters?.find((c) => c.id === characterId);
+    if (!character) {
+      toast.error('Character not found');
+      return;
+    }
 
-    const mockImages = [
-      'https://images.unsplash.com/photo-1472289065668-ce650ac443d2?w=200&h=200&fit=crop',
-      'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200&h=200&fit=crop',
-      'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=200&h=200&fit=crop',
-    ];
+    setGeneratingCharId(characterId);
+    
+    try {
+      const requestPayload = {
+        character_name: character.name,
+        character_description: character.description,
+      };
+      
+      console.log('Calling generate-character-images edge function...');
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-character-images`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify(requestPayload),
+        }
+      );
 
-    await updateCharacter.mutateAsync({
-      id: characterId,
-      projectId: projectId!,
-      updates: { reference_images: mockImages },
-    });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Image generation failed');
+      }
 
-    logApiCall('Generate Reference Images', { characterId }, mockImages);
-    toast.success('Reference images generated! (Demo data)');
-    setIsGenerating(false);
+      logApiCall('Generate Reference Images', requestPayload, data);
+      
+      // Save images to character
+      await updateCharacter.mutateAsync({
+        id: characterId,
+        projectId: projectId!,
+        updates: {
+          reference_images: data.images,
+          primary_image_url: data.images[0] || null,
+        },
+      });
+      
+      toast.success('Reference images generated successfully!');
+    } catch (error) {
+      console.error('Image generation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Image generation failed';
+      logApiCall('Generate Reference Images (Error)', { characterId }, { error: errorMessage });
+      toast.error(errorMessage);
+    } finally {
+      setGeneratingCharId(null);
+    }
   };
 
   const handleSetPrimary = async (characterId: string, imageUrl: string) => {
@@ -250,40 +286,60 @@ export default function Characters() {
                 </p>
 
                 {character.reference_images.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    {character.reference_images.map((img, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSetPrimary(character.id, img)}
-                        className={cn(
-                          'relative aspect-square rounded-lg overflow-hidden border-2 transition-colors',
-                          character.primary_image_url === img
-                            ? 'border-primary'
-                            : 'border-transparent hover:border-muted-foreground/50'
-                        )}
-                      >
-                        <img
-                          src={img}
-                          alt={`${character.name} reference ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        {character.primary_image_url === img && (
-                          <div className="absolute top-1 right-1 bg-primary rounded-full p-0.5">
-                            <Star className="h-3 w-3 text-primary-foreground fill-current" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {character.reference_images.map((img, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handleSetPrimary(character.id, img)}
+                          className={cn(
+                            'relative aspect-square rounded-lg overflow-hidden border-2 transition-colors',
+                            character.primary_image_url === img
+                              ? 'border-primary'
+                              : 'border-transparent hover:border-muted-foreground/50'
+                          )}
+                        >
+                          <img
+                            src={img}
+                            alt={`${character.name} reference ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          {character.primary_image_url === img && (
+                            <div className="absolute top-1 right-1 bg-primary rounded-full p-0.5">
+                              <Star className="h-3 w-3 text-primary-foreground fill-current" />
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2"
+                      onClick={() => handleGenerateImages(character.id)}
+                      disabled={generatingCharId === character.id}
+                    >
+                      {generatingCharId === character.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                      {generatingCharId === character.id ? 'Regenerating...' : 'Regenerate Images'}
+                    </Button>
                   </div>
                 ) : (
                   <Button
                     variant="outline"
                     className="w-full gap-2"
                     onClick={() => handleGenerateImages(character.id)}
-                    disabled={isGenerating}
+                    disabled={generatingCharId === character.id}
                   >
-                    <Wand2 className="h-4 w-4" />
-                    {isGenerating ? 'Generating...' : 'Generate Reference Images'}
+                    {generatingCharId === character.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-4 w-4" />
+                    )}
+                    {generatingCharId === character.id ? 'Generating (30-60s)...' : 'Generate Reference Images'}
                   </Button>
                 )}
               </CardContent>
