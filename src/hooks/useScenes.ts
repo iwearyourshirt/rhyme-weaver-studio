@@ -70,6 +70,10 @@ export function useUpdateScene() {
         image_status: GenerationStatus;
         video_url: string | null;
         video_status: GenerationStatus;
+      scene_number: number;
+      start_time: number;
+      end_time: number;
+      lyric_snippet: string;
       }>;
     }) => {
       const { data, error } = await supabase
@@ -124,6 +128,47 @@ export function useDeleteScenes() {
     },
     onSuccess: (_, projectId) => {
       queryClient.invalidateQueries({ queryKey: ['scenes', projectId] });
+    },
+  });
+}
+
+export function useDeleteScene() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, projectId }: { id: string; projectId: string }) => {
+      const { error } = await supabase
+        .from('scenes')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['scenes', variables.projectId] });
+    },
+  });
+}
+
+export function useRenumberScenes() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ projectId, sceneUpdates }: { 
+      projectId: string; 
+      sceneUpdates: { id: string; scene_number: number }[] 
+    }) => {
+      for (const update of sceneUpdates) {
+        const { error } = await supabase
+          .from('scenes')
+          .update({ scene_number: update.scene_number })
+          .eq('id', update.id);
+        
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['scenes', variables.projectId] });
     },
   });
 }
