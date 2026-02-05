@@ -525,7 +525,13 @@ import { useScenesRealtime } from '@/hooks/useScenesRealtime';
                     <div className="flex gap-4">
                       <div className="w-24 h-24 flex-shrink-0 rounded-lg border-2 border-dashed border-muted-foreground/30 flex items-center justify-center bg-muted/30 relative group">
                         {scene.image_url ? (
-                          <img src={scene.image_url} alt={`Scene ${scene.scene_number}`} className="w-full h-full object-cover rounded-lg" />
+                          <button
+                            onClick={() => navigate(`/project/${projectId}/images`)}
+                            className="w-full h-full cursor-pointer"
+                            title="Go to Image Generator"
+                          >
+                            <img src={scene.image_url} alt={`Scene ${scene.scene_number}`} className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity" />
+                          </button>
                         ) : (
                           <button
                             onClick={() => navigate(`/project/${projectId}/images`)}
