@@ -150,7 +150,11 @@ export default function ImageGeneration() {
         if (isNetworkishInvokeError(error.message)) {
           const statusRow = await verifyIfGenerationStartedOrFinished();
           if (statusRow) {
-            // Treat as success/in-progress; realtime/refetch will update UI.
+            // If done, clear generating flag so button re-enables.
+            // If still generating, realtime/refetch will handle it.
+            if (statusRow.image_status === 'done') {
+              clearGeneratingFlag();
+            }
             toast.info(`Connection hiccup — scene ${statusRow.scene_number} is ${statusRow.image_status}.`);
             return;
           }
@@ -170,6 +174,9 @@ export default function ImageGeneration() {
       if (isNetworkishInvokeError(message)) {
         const statusRow = await verifyIfGenerationStartedOrFinished();
         if (statusRow) {
+          if (statusRow.image_status === 'done') {
+            clearGeneratingFlag();
+          }
           toast.info(`Connection hiccup — scene ${statusRow.scene_number} is ${statusRow.image_status}.`);
           return;
         }
