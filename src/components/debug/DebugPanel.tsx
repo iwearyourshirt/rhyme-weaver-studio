@@ -1,4 +1,4 @@
-import { X, Copy, Check } from 'lucide-react';
+import { X, Copy, Check, Video } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -6,9 +6,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDebug } from '@/contexts/DebugContext';
 import { cn } from '@/lib/utils';
 
+const COST_PER_SECOND = 0.04;
+const VIDEO_DURATION = 6;
+const COST_PER_VIDEO = COST_PER_SECOND * VIDEO_DURATION;
+
 export function DebugPanel() {
-  const { isOpen, setIsOpen, currentPage, projectData, lastApiCall, promptLogs, clearPromptLogs } = useDebug();
+  const { 
+    isOpen, 
+    setIsOpen, 
+    currentPage, 
+    projectData, 
+    lastApiCall, 
+    promptLogs, 
+    clearPromptLogs,
+    videoDebug,
+    clearVideoDebug,
+  } = useDebug();
   const [copied, setCopied] = useState(false);
+  const [copiedVideo, setCopiedVideo] = useState(false);
 
   const handleCopy = () => {
     const debugInfo = {
@@ -24,12 +39,68 @@ export function DebugPanel() {
         ...log,
         timestamp: log.timestamp.toISOString(),
       })),
+      videoDebug,
     };
 
     navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const handleCopyVideoDebug = () => {
+    const doneScenes = videoDebug.scenes.filter((s) => s.status === 'done');
+    const failedScenes = videoDebug.scenes.filter((s) => s.status === 'failed');
+    const generatingScenes = videoDebug.scenes.filter((s) => s.status === 'generating');
+    const pendingScenes = videoDebug.scenes.filter((s) => s.status === 'pending');
+
+    const report = `
+VIDEO GENERATION DEBUG REPORT
+=============================
+Model: ${videoDebug.model}
+
+SUMMARY
+-------
+Total Scenes: ${videoDebug.scenes.length}
+Completed: ${doneScenes.length}
+Failed: ${failedScenes.length}
+Generating: ${generatingScenes.length}
+Pending: ${pendingScenes.length}
+
+Total Generation Time: ${formatDuration(videoDebug.totalGenerationTimeMs)}
+Estimated Cost: $${(doneScenes.length * COST_PER_VIDEO).toFixed(2)}
+
+SCENE DETAILS
+-------------
+${videoDebug.scenes.map((s) => {
+  const genTime = s.generationStartTime && s.generationEndTime 
+    ? formatDuration(s.generationEndTime - s.generationStartTime)
+    : 'N/A';
+  return `Scene ${s.sceneNumber}: ${s.status.toUpperCase()}
+  Request ID: ${s.requestId || 'N/A'}
+  Generation Time: ${genTime}
+  Video URL: ${s.videoUrl || 'N/A'}
+  Error: ${s.error || 'None'}`;
+}).join('\n\n')}
+`.trim();
+
+    navigator.clipboard.writeText(report);
+    setCopiedVideo(true);
+    setTimeout(() => setCopiedVideo(false), 2000);
+  };
+
+  const formatDuration = (ms: number) => {
+    if (ms === 0) return '0s';
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (minutes > 0) {
+      return `${minutes}m ${remainingSeconds}s`;
+    }
+    return `${seconds}s`;
+  };
+
+  const doneCount = videoDebug.scenes.filter((s) => s.status === 'done').length;
+  const totalCount = videoDebug.scenes.length;
 
   return (
     <div
@@ -46,9 +117,9 @@ export function DebugPanel() {
       </div>
 
       <Tabs defaultValue="general" className="flex flex-col h-[calc(100vh-8rem)]">
-        <TabsList className="mx-4 mt-2 grid w-auto grid-cols-3">
+        <TabsList className="mx-4 mt-2 grid w-auto grid-cols-4">
           <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="api">API Calls</TabsTrigger>
+          <TabsTrigger value="api">API</TabsTrigger>
           <TabsTrigger value="prompts">
             Prompts
             {promptLogs.length > 0 && (
@@ -56,6 +127,10 @@ export function DebugPanel() {
                 {promptLogs.length}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="video">
+            <Video className="h-3 w-3 mr-1" />
+            Video
           </TabsTrigger>
         </TabsList>
         
@@ -150,6 +225,122 @@ export function DebugPanel() {
                   </div>
                 ))}
               </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="video" className="p-4 space-y-4 mt-0">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-muted-foreground">
+                Video Generation
+              </h3>
+              {videoDebug.scenes.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={clearVideoDebug}>
+                  Clear
+                </Button>
+              )}
+            </div>
+
+            {/* Model Info */}
+            <section className="space-y-2">
+              <h4 className="text-xs font-medium">Current Model</h4>
+              <code className="block p-2 bg-muted rounded-md text-xs break-all">
+                {videoDebug.model}
+              </code>
+            </section>
+
+            {/* Stats Summary */}
+            {videoDebug.scenes.length > 0 && (
+              <section className="space-y-2">
+                <h4 className="text-xs font-medium">Stats</h4>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2 bg-muted rounded-md">
+                    <span className="text-muted-foreground">Completed:</span>
+                    <span className="ml-1 font-medium">{doneCount}/{totalCount}</span>
+                  </div>
+                  <div className="p-2 bg-muted rounded-md">
+                    <span className="text-muted-foreground">Time:</span>
+                    <span className="ml-1 font-medium">{formatDuration(videoDebug.totalGenerationTimeMs)}</span>
+                  </div>
+                  <div className="p-2 bg-muted rounded-md col-span-2">
+                    <span className="text-muted-foreground">Est. Cost:</span>
+                    <span className="ml-1 font-medium">${(doneCount * COST_PER_VIDEO).toFixed(2)}</span>
+                    <span className="text-muted-foreground ml-1">({doneCount} × $0.24)</span>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Scene Status Table */}
+            {videoDebug.scenes.length > 0 ? (
+              <section className="space-y-2">
+                <h4 className="text-xs font-medium">Scene Status</h4>
+                <div className="space-y-2">
+                  {videoDebug.scenes.map((scene) => (
+                    <div 
+                      key={scene.sceneId} 
+                      className={cn(
+                        "p-2 rounded-md text-xs space-y-1",
+                        scene.status === 'done' && "bg-success/10 border border-success/30",
+                        scene.status === 'failed' && "bg-destructive/10 border border-destructive/30",
+                        scene.status === 'generating' && "bg-warning/10 border border-warning/30",
+                        scene.status === 'pending' && "bg-muted"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Scene {scene.sceneNumber}</span>
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded text-[10px] uppercase font-medium",
+                          scene.status === 'done' && "bg-success/20 text-success",
+                          scene.status === 'failed' && "bg-destructive/20 text-destructive",
+                          scene.status === 'generating' && "bg-warning/20 text-warning-foreground",
+                          scene.status === 'pending' && "bg-muted-foreground/20 text-muted-foreground"
+                        )}>
+                          {scene.status}
+                        </span>
+                      </div>
+                      {scene.requestId && (
+                        <div className="text-muted-foreground truncate">
+                          ID: {scene.requestId.substring(0, 20)}...
+                        </div>
+                      )}
+                      {scene.generationStartTime && scene.generationEndTime && (
+                        <div className="text-muted-foreground">
+                          Gen time: {formatDuration(scene.generationEndTime - scene.generationStartTime)}
+                        </div>
+                      )}
+                      {scene.error && (
+                        <div className="text-destructive text-[10px]">
+                          Error: {scene.error}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Copy Debug Report Button */}
+                <Button 
+                  onClick={handleCopyVideoDebug} 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full mt-2"
+                >
+                  {copiedVideo ? (
+                    <>
+                      <Check className="h-3 w-3 mr-1" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Debug Report
+                    </>
+                  )}
+                </Button>
+              </section>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No video generation data yet. Start generating videos to see debug info.
+              </p>
             )}
           </TabsContent>
         </ScrollArea>

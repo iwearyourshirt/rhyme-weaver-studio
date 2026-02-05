@@ -12,8 +12,9 @@ import { VideoSceneCard } from '@/components/video-generation/VideoSceneCard';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-const COST_PER_VIDEO = 0.25;
-const POLL_INTERVAL = 15000; // 15 seconds
+const COST_PER_VIDEO = 0.24; // LTX Video 2.0 Fast: $0.04/sec × 6 seconds
+const VIDEO_MODEL_ENDPOINT = "fal-ai/ltx-2/image-to-video/fast";
+const POLL_INTERVAL = 5000; // 5 seconds - LTX is much faster than Kling
 
 export default function VideoGeneration() {
   const { projectId } = useParams();
@@ -22,7 +23,7 @@ export default function VideoGeneration() {
   const { data: scenes, isLoading } = useScenes(projectId);
   const updateScene = useUpdateScene();
   const updateProject = useUpdateProject();
-  const { setCurrentPage, setProjectData, logApiCall } = useDebug();
+  const { setCurrentPage, setProjectData, logApiCall, updateVideoSceneStatus, setVideoModel } = useDebug();
 
   // Enable realtime updates
   useScenesRealtime(projectId);
@@ -31,11 +32,27 @@ export default function VideoGeneration() {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const toastShownRef = useRef<Set<string>>(new Set());
+  const generationStartTimesRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     setCurrentPage('Video Generation');
     setProjectData({ project, scenes });
-  }, [setCurrentPage, setProjectData, project, scenes]);
+    setVideoModel(VIDEO_MODEL_ENDPOINT);
+    
+    // Initialize scene statuses in debug context
+    if (scenes) {
+      scenes.forEach((scene) => {
+        updateVideoSceneStatus({
+          sceneNumber: scene.scene_number,
+          sceneId: scene.id,
+          status: scene.video_status as 'pending' | 'generating' | 'done' | 'failed',
+          requestId: scene.video_request_id || undefined,
+          videoUrl: scene.video_url || undefined,
+          error: scene.video_error || undefined,
+        });
+      });
+    }
+  }, [setCurrentPage, setProjectData, project, scenes, setVideoModel, updateVideoSceneStatus]);
 
   // Calculate progress
   const doneCount = scenes?.filter((s) => s.video_status === 'done').length || 0;
@@ -66,22 +83,49 @@ export default function VideoGeneration() {
       const data = response.data;
       logApiCall('Poll Video Status', { project_id: projectId }, data);
 
-      // Show toasts for completed videos
+      // Show toasts and update debug context for completed videos
       if (data.updates) {
         for (const update of data.updates) {
+          const generationEndTime = Date.now();
+          const startTime = generationStartTimesRef.current.get(update.scene_id);
+          
           if (update.status === 'done' && !toastShownRef.current.has(update.scene_id)) {
             toastShownRef.current.add(update.scene_id);
             toast.success(`Scene ${update.scene_number} video generated!`);
+            
+            // Update debug context with completion info
+            updateVideoSceneStatus({
+              sceneNumber: update.scene_number,
+              sceneId: update.scene_id,
+              status: 'done',
+              videoUrl: update.video_url,
+              generationStartTime: startTime,
+              generationEndTime,
+            });
+            
+            generationStartTimesRef.current.delete(update.scene_id);
           } else if (update.status === 'failed' && !toastShownRef.current.has(update.scene_id)) {
             toastShownRef.current.add(update.scene_id);
             toast.error(`Scene ${update.scene_number} failed: ${update.error || 'Unknown error'}`);
+            
+            // Update debug context with failure info
+            updateVideoSceneStatus({
+              sceneNumber: update.scene_number,
+              sceneId: update.scene_id,
+              status: 'failed',
+              error: update.error,
+              generationStartTime: startTime,
+              generationEndTime,
+            });
+            
+            generationStartTimesRef.current.delete(update.scene_id);
           }
         }
       }
     } catch (error) {
       console.error('Error polling video status:', error);
     }
-  }, [projectId, logApiCall]);
+  }, [projectId, logApiCall, updateVideoSceneStatus]);
 
   // Start/stop polling based on generating scenes
   useEffect(() => {
@@ -110,7 +154,17 @@ export default function VideoGeneration() {
     const scene = scenes?.find((s) => s.id === sceneId);
     if (!scene || !scene.image_url) return;
 
+    const generationStartTime = Date.now();
+    generationStartTimesRef.current.set(sceneId, generationStartTime);
     setGeneratingIds((prev) => new Set(prev).add(sceneId));
+    
+    // Track in debug context
+    updateVideoSceneStatus({
+      sceneNumber: scene.scene_number,
+      sceneId: sceneId,
+      status: 'generating',
+      generationStartTime,
+    });
 
     try {
       const response = await supabase.functions.invoke('generate-scene-video', {
@@ -128,6 +182,15 @@ export default function VideoGeneration() {
       }
 
       logApiCall('Generate Video', { scene_id: sceneId }, response.data);
+      
+      // Update debug with request ID
+      updateVideoSceneStatus({
+        sceneNumber: scene.scene_number,
+        sceneId: sceneId,
+        status: 'generating',
+        requestId: response.data.request_id,
+        generationStartTime,
+      });
 
       // Start polling if not already
       if (!pollIntervalRef.current) {
@@ -240,7 +303,7 @@ export default function VideoGeneration() {
                   {readyToGenerateCount} scenes ready to generate
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Estimated cost: ${estimatedCost} ({readyToGenerateCount} × ${COST_PER_VIDEO})
+                  {readyToGenerateCount} × ${COST_PER_VIDEO} = ${estimatedCost} estimated cost
                 </p>
               </div>
             </div>
