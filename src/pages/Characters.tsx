@@ -318,13 +318,13 @@ export default function Characters() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto animate-fade-in space-y-6">
+    <div className="max-w-5xl mx-auto animate-fade-in space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Characters
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Define the characters in your nursery rhyme
           </p>
         </div>
@@ -376,17 +376,16 @@ export default function Characters() {
       </div>
 
       {characters?.length === 0 ? (
-        <Card className="card-shadow">
+        <Card className="border">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <Plus className="h-8 w-8 text-muted-foreground" />
+            <div className="h-12 w-12 rounded-md bg-muted flex items-center justify-center mb-4">
+              <Plus className="h-6 w-6 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-medium text-foreground mb-2">
+            <h3 className="text-base font-medium text-foreground mb-2">
               No characters yet
             </h3>
-            <p className="text-muted-foreground text-center max-w-md mb-6">
-              Add characters to your nursery rhyme to get started with the
-              storyboard.
+            <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
+              Add characters to your nursery rhyme to get started.
             </p>
             <Button onClick={() => setDialogOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
@@ -395,12 +394,12 @@ export default function Characters() {
           </CardContent>
         </Card>
       ) : (
-         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {characters?.map((character) => (
-            <Card key={character.id} className="card-shadow group">
-               <CardHeader className="flex flex-row items-start justify-between space-y-0 p-3 pb-2">
-                 <div className="flex flex-col gap-1">
-                    <CardTitle className="text-base">{character.name}</CardTitle>
+            <Card key={character.id} className="border group">
+               <CardHeader className="flex flex-row items-start justify-between space-y-0 p-4 pb-3">
+                 <div className="flex flex-col gap-1.5">
+                    <CardTitle className="text-sm font-medium">{character.name}</CardTitle>
                    <Badge 
                      variant={character.character_type === 'environment' ? 'secondary' : 'outline'}
                      className="w-fit text-xs gap-1"

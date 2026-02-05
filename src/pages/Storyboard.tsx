@@ -381,13 +381,13 @@ export default function Storyboard() {
    }
  
    return (
-     <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
+     <div className="max-w-4xl mx-auto animate-fade-in space-y-8">
        <div className="flex items-center justify-between">
          <div>
-           <h1 className="text-3xl font-display font-bold text-foreground">
+           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
              Storyboard
            </h1>
-           <p className="text-muted-foreground mt-1">
+           <p className="text-sm text-muted-foreground mt-1">
              Plan each scene of your animated video
            </p>
          </div>
@@ -397,6 +397,7 @@ export default function Storyboard() {
                <AlertDialogTrigger asChild>
                  <Button
                    variant="outline"
+                   size="sm"
                    disabled={isGenerating || !project?.timestamps?.length}
                    className="gap-2"
                  >
@@ -408,7 +409,7 @@ export default function Storyboard() {
                  <AlertDialogHeader>
                    <AlertDialogTitle>Regenerate Storyboard?</AlertDialogTitle>
                    <AlertDialogDescription>
-                     This will delete all existing scenes and generate a fresh storyboard. Any edits you've made will be lost.
+                     This will delete all existing scenes and generate a fresh storyboard.
                    </AlertDialogDescription>
                  </AlertDialogHeader>
                  <AlertDialogFooter>
@@ -430,28 +431,28 @@ export default function Storyboard() {
              ) : (
                <Wand2 className="h-4 w-4" />
              )}
-             {isGenerating ? 'Generating (30-60s)...' : 'Generate Storyboard'}
+             {isGenerating ? 'Generating...' : 'Generate Storyboard'}
            </Button>
          </div>
        </div>
  
        {scenes && scenes.length > 0 && (
-         <div className="flex gap-4 p-4 bg-muted/50 rounded-lg">
+         <div className="flex gap-6 py-3 px-4 bg-muted/50 rounded-md text-sm">
            <div className="flex items-center gap-2">
              <Film className="h-4 w-4 text-muted-foreground" />
-             <span className="text-sm font-medium">{totalScenes} scenes</span>
+             <span className="font-medium">{totalScenes} scenes</span>
            </div>
            <div className="flex items-center gap-2">
              <Clock className="h-4 w-4 text-muted-foreground" />
-             <span className="text-sm font-medium">{formatDuration(totalDuration)} total</span>
+             <span className="font-medium">{formatDuration(totalDuration)} total</span>
            </div>
          </div>
        )}
  
        {!project?.timestamps?.length && (
-         <Card className="card-shadow border-warning/50">
-           <CardContent className="py-6">
-             <p className="text-warning-foreground">
+         <Card className="border border-warning/30 bg-warning/5">
+           <CardContent className="py-4">
+             <p className="text-sm text-warning-foreground">
                Please complete the Project Setup step first to add timestamps.
              </p>
            </CardContent>

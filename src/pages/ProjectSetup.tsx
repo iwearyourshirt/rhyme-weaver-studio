@@ -204,23 +204,23 @@ export default function ProjectSetup() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
+    <div className="max-w-3xl mx-auto animate-fade-in space-y-8">
       <div>
-        <h1 className="text-3xl font-display font-bold text-foreground">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
           Project Setup
         </h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Upload your audio and transcribe the lyrics
         </p>
       </div>
 
-      <Card className="card-shadow">
-        <CardHeader>
-          <CardTitle>Project Details</CardTitle>
+      <Card className="border">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-medium">Project Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Project Name</Label>
+            <Label htmlFor="name" className="text-sm">Project Name</Label>
             <Input
               id="name"
               value={projectName}
@@ -231,9 +231,9 @@ export default function ProjectSetup() {
         </CardContent>
       </Card>
 
-      <Card className="card-shadow">
-        <CardHeader>
-          <CardTitle>Audio File</CardTitle>
+      <Card className="border">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-medium">Audio File</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <input
@@ -291,13 +291,13 @@ export default function ProjectSetup() {
           ) : (
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-border rounded-lg p-12 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/50 transition-colors"
+              className="border border-dashed border-border rounded-md p-12 text-center cursor-pointer hover:border-foreground/30 hover:bg-muted/30 transition-colors"
             >
-              <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-lg font-medium text-foreground">
+              <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-4" />
+              <p className="text-sm font-medium text-foreground">
                 {isUploading ? 'Uploading...' : 'Upload Audio File'}
               </p>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 MP3 or WAV files supported
               </p>
             </div>
@@ -306,11 +306,11 @@ export default function ProjectSetup() {
       </Card>
 
       {timestamps.length > 0 && (
-        <Card className="card-shadow">
-          <CardHeader>
-            <CardTitle>Lyrics & Timestamps</CardTitle>
+        <Card className="border">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base font-medium">Lyrics & Timestamps</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {timestamps.map((entry, index) => (
               <div
                 key={index}
@@ -359,41 +359,41 @@ export default function ProjectSetup() {
       )}
 
       {/* Creative Direction */}
-      <Card className="card-shadow">
-        <CardHeader>
-          <CardTitle>Creative Direction</CardTitle>
-          <CardDescription>
-            These guide all AI-generated images and videos in this project. Set once, applied everywhere.
+      <Card className="border">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-medium">Creative Direction</CardTitle>
+          <CardDescription className="text-xs">
+            These guide all AI-generated images and videos in this project.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="style">Visual Style *</Label>
+            <Label htmlFor="style" className="text-sm">Visual Style *</Label>
             <Input
               id="style"
               value={styleDirection}
               onChange={(e) => setStyleDirection(e.target.value)}
-              placeholder="e.g. felted wool characters, watercolor, pixel art, claymation"
+              placeholder="e.g. felted wool characters, watercolor, pixel art"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="animation">Animation Feel *</Label>
+            <Label htmlFor="animation" className="text-sm">Animation Feel *</Label>
             <Input
               id="animation"
               value={animationDirection}
               onChange={(e) => setAnimationDirection(e.target.value)}
-              placeholder="e.g. stop-motion, slow and dreamy, energetic, hand-drawn"
+              placeholder="e.g. stop-motion, slow and dreamy, energetic"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cinematography">Cinematography Notes</Label>
+            <Label htmlFor="cinematography" className="text-sm">Cinematography Notes</Label>
             <Textarea
               id="cinematography"
               value={cinematographyDirection}
               onChange={(e) => setCinematographyDirection(e.target.value)}
-              placeholder="e.g. vary shot distances, not every scene needs characters, cinematic framing"
+              placeholder="e.g. vary shot distances, cinematic framing"
               className="min-h-[80px]"
             />
           </div>

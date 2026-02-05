@@ -90,20 +90,20 @@ export default function ProjectsList() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto animate-fade-in">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-5xl mx-auto animate-fade-in">
+      <div className="flex items-center justify-between mb-10">
         <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">
-            Your Projects
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Projects
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Create animated nursery rhyme videos
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage your nursery rhyme videos
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="lg" className="gap-2">
-              <Plus className="h-5 w-5" />
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
               New Project
             </Button>
           </DialogTrigger>
@@ -164,35 +164,35 @@ export default function ProjectsList() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {projects?.map((project) => (
             <Card
               key={project.id}
-              className="card-shadow hover:card-shadow-lg transition-shadow cursor-pointer group"
+              className="border hover:border-foreground/20 transition-colors cursor-pointer group"
               onClick={() => handleOpenProject(project.id, project.status)}
             >
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                <CardTitle className="text-lg font-medium line-clamp-1">
+              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
+                <CardTitle className="text-base font-medium line-clamp-1">
                   {project.name}
                 </CardTitle>
-                <div className="flex items-center gap-1 -mt-1 -mr-2">
+                <div className="flex items-center gap-0.5 -mt-1 -mr-2">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={(e) => handleOpenRenameDialog(e, project)}
                   >
-                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
                     </AlertDialogTrigger>
                   <AlertDialogContent onClick={(e) => e.stopPropagation()}>
@@ -216,15 +216,15 @@ export default function ProjectsList() {
                   </AlertDialog>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {statusLabels[project.status]}
                   </span>
                   <StatusBadge status={project.status === 'export' ? 'done' : 'pending'} />
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Created {new Date(project.created_at).toLocaleDateString()}
+                <p className="text-xs text-muted-foreground mt-3 font-mono">
+                  {new Date(project.created_at).toLocaleDateString()}
                 </p>
               </CardContent>
             </Card>

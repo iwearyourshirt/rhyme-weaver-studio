@@ -94,7 +94,7 @@ export function SceneCard({
   const progressPercent = Math.min((elapsedTime / ESTIMATED_GENERATION_TIME) * 100, 95);
 
   return (
-    <Card className="card-shadow overflow-hidden group">
+    <Card className="border overflow-hidden group">
       <div className="aspect-[3/2] bg-muted relative">
         {scene.image_url ? (
           <img
@@ -104,22 +104,22 @@ export function SceneCard({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <ImageIcon className="h-12 w-12 text-muted-foreground/30" />
+            <ImageIcon className="h-10 w-10 text-muted-foreground/20" />
           </div>
         )}
         {isGenerating && (
-          <div className="absolute inset-0 bg-background/90 flex flex-col items-center justify-center gap-3 p-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
-            <div className="w-full max-w-[200px]">
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div className="absolute inset-0 bg-background/95 flex flex-col items-center justify-center gap-3 p-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-foreground border-t-transparent" />
+            <div className="w-full max-w-[160px]">
+              <div className="h-1 bg-muted rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-primary transition-all duration-1000 ease-linear"
+                  className="h-full bg-foreground transition-all duration-1000 ease-linear"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
             </div>
-            <p className="text-sm text-muted-foreground text-center">
-              {elapsedTime}s / ~{ESTIMATED_GENERATION_TIME}s estimated
+            <p className="text-xs text-muted-foreground text-center font-mono">
+              {elapsedTime}s / ~{ESTIMATED_GENERATION_TIME}s
             </p>
           </div>
         )}
@@ -127,26 +127,26 @@ export function SceneCard({
         {/* Approval checkbox overlay */}
         <div className="absolute top-2 right-2">
           <div 
-            className={`flex items-center justify-center w-8 h-8 rounded-md cursor-pointer transition-colors ${
+            className={`flex items-center justify-center w-7 h-7 rounded cursor-pointer transition-colors ${
               scene.image_approved 
                 ? 'bg-primary text-primary-foreground' 
-                : 'bg-background/80 hover:bg-background text-muted-foreground'
+                : 'bg-background/90 hover:bg-background text-muted-foreground border border-border'
             }`}
             onClick={() => onApprovalChange(!scene.image_approved)}
             title={scene.image_approved ? 'Approved - click to unapprove' : 'Click to approve'}
           >
-            <Check className="h-5 w-5" />
+            <Check className="h-4 w-4" />
           </div>
         </div>
       </div>
       
-      <CardContent className="p-3 space-y-3">
+      <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">Scene {scene.scene_number}</span>
           <StatusBadge status={scene.image_status} />
         </div>
         
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground font-mono">
           {formatTime(scene.start_time)} - {formatTime(scene.end_time)}
         </p>
         

@@ -50,12 +50,12 @@ export function AppSidebar() {
   return (
     <Sidebar variant="overlay" className="border-r border-sidebar-border">
       <SidebarHeader className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Music className="h-4 w-4 text-primary-foreground" />
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-foreground">
+            <Music className="h-4 w-4 text-background" />
           </div>
           <div>
-            <h1 className="font-display font-semibold text-sidebar-foreground">
+            <h1 className="font-semibold text-sm tracking-tight text-sidebar-foreground">
               Rhyme Studio
             </h1>
             <p className="text-xs text-muted-foreground">Video Creator</p>
@@ -123,11 +123,11 @@ export function AppSidebar() {
                               )
                             }
                           >
-                            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                            <span className="flex h-5 w-5 items-center justify-center text-xs font-mono text-muted-foreground">
                               {index + 1}
-                            </div>
+                            </span>
                             <item.icon className="h-4 w-4" />
-                            <span>{item.title}</span>
+                            <span className="text-sm">{item.title}</span>
                           </NavLink>
                         </SidebarMenuButton>
                       </SidebarMenuItem>

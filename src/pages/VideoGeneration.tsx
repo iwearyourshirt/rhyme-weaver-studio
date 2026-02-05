@@ -341,30 +341,29 @@ export default function VideoGeneration() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto animate-fade-in space-y-6">
+    <div className="max-w-5xl mx-auto animate-fade-in space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Video Generation
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Animate each scene with gentle, dreamlike motion
           </p>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
-          {/* Progress */}
-          <div className="text-sm text-muted-foreground">
-            {doneCount} / {totalCount} complete
+          <div className="text-xs text-muted-foreground font-mono">
+            {doneCount}/{totalCount} complete
             {generatingCount > 0 && ` (${generatingCount} generating)`}
           </div>
-          <Progress value={(doneCount / totalCount) * 100} className="w-32" />
+          <Progress value={(doneCount / totalCount) * 100} className="w-24 h-1.5" />
         </div>
       </div>
 
       {/* Cost Estimate & Generate All */}
       {readyToGenerateCount > 0 && (
-        <Card className="border-primary/20 bg-primary/5">
+        <Card className="border border-primary/20 bg-primary/5">
           <CardContent className="p-4 flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
               <DollarSign className="h-5 w-5 text-primary" />
@@ -372,8 +371,8 @@ export default function VideoGeneration() {
                 <p className="text-sm font-medium">
                   {readyToGenerateCount} scenes ready to generate
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {readyToGenerateCount} × ${COST_PER_VIDEO} = ${estimatedCost} estimated cost
+                <p className="text-xs text-muted-foreground font-mono">
+                  {readyToGenerateCount} × ${COST_PER_VIDEO} = ${estimatedCost} estimated
                 </p>
               </div>
             </div>
@@ -382,7 +381,7 @@ export default function VideoGeneration() {
                 onClick={handleCancelAll}
                 disabled={isCancellingAll}
                 variant="destructive"
-                className="gap-2"
+                size="sm"
               >
                 {isCancellingAll ? 'Cancelling...' : 'Cancel All'}
               </Button>
@@ -390,6 +389,7 @@ export default function VideoGeneration() {
               <Button
                 onClick={handleGenerateAll}
                 disabled={isGeneratingAll}
+                size="sm"
                 className="gap-2"
               >
                 <Wand2 className="h-4 w-4" />
@@ -402,7 +402,7 @@ export default function VideoGeneration() {
 
       {/* Scene Grid */}
       {scenes && scenes.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
           {scenes.map((scene) => (
             <VideoSceneCard
               key={scene.id}
@@ -424,13 +424,13 @@ export default function VideoGeneration() {
           ))}
         </div>
       ) : (
-        <Card className="card-shadow">
+        <Card className="border">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <Video className="h-16 w-16 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">
+            <Video className="h-12 w-12 text-muted-foreground/30 mb-4" />
+            <h3 className="text-base font-medium text-foreground mb-2">
               No scenes yet
             </h3>
-            <p className="text-muted-foreground text-center max-w-md">
+            <p className="text-sm text-muted-foreground text-center max-w-md">
               Complete the Image Generation step first.
             </p>
           </CardContent>

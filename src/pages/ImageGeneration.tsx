@@ -266,25 +266,26 @@ export default function ImageGeneration() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto animate-fade-in space-y-6">
+    <div className="max-w-5xl mx-auto animate-fade-in space-y-8">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Image Generation
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Generate images for each scene
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="text-sm text-muted-foreground">
-            {approvedCount} / {totalCount} approved
+          <div className="text-xs text-muted-foreground font-mono">
+            {approvedCount}/{totalCount} approved
           </div>
-          <Progress value={(approvedCount / totalCount) * 100} className="w-32" />
+          <Progress value={(approvedCount / totalCount) * 100} className="w-24 h-1.5" />
           {generatingAll ? (
             <Button
               onClick={handleCancelAll}
               variant="destructive"
+              size="sm"
               className="gap-2"
             >
               Cancel All
@@ -293,6 +294,7 @@ export default function ImageGeneration() {
             <Button
               onClick={handleGenerateAll}
               disabled={generatingIds.size > 0}
+              size="sm"
               className="gap-2"
             >
               <Wand2 className="h-4 w-4" />
@@ -303,7 +305,7 @@ export default function ImageGeneration() {
       </div>
 
       {scenes && scenes.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {scenes.map((scene) => (
             <SceneCard
               key={scene.id}
@@ -317,13 +319,13 @@ export default function ImageGeneration() {
           ))}
         </div>
       ) : (
-        <Card className="card-shadow">
+        <Card className="border">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <ImageIcon className="h-16 w-16 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">
+            <ImageIcon className="h-12 w-12 text-muted-foreground/30 mb-4" />
+            <h3 className="text-base font-medium text-foreground mb-2">
               No scenes yet
             </h3>
-            <p className="text-muted-foreground text-center max-w-md">
+            <p className="text-sm text-muted-foreground text-center max-w-md">
               Complete the Storyboard step first to generate scenes.
             </p>
           </CardContent>
