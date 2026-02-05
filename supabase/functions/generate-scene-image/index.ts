@@ -7,37 +7,91 @@
      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
  };
  
- interface Character {
-   id: string;
-   name: string;
-   primary_image_url: string | null;
-   character_type: string | null;
- }
- 
- interface DownloadedImage {
-   name: string;
-   bytes: Uint8Array;
-   mimeType: string;
- }
- 
- async function downloadImage(url: string, name: string): Promise<DownloadedImage | null> {
-   try {
-     const response = await fetch(url);
-     if (!response.ok) {
-       console.error(`Failed to download image from ${url}: ${response.status}`);
-       return null;
-     }
-     
-     const contentType = response.headers.get("content-type") || "image/png";
-     const arrayBuffer = await response.arrayBuffer();
-     const uint8Array = new Uint8Array(arrayBuffer);
-     
-     return { name, bytes: uint8Array, mimeType: contentType };
-   } catch (error) {
-     console.error(`Error downloading image from ${url}:`, error);
-     return null;
-   }
- }
+interface Character {
+  id: string;
+  name: string;
+  primary_image_url: string | null;
+  character_type: string | null;
+}
+
+interface DownloadedImage {
+  name: string;
+  bytes: Uint8Array;
+  mimeType: string;
+}
+
+// Cost logging helper - gpt-image-1: $0.04 (medium), $0.08 (high)
+async function logAICost(
+  supabaseUrl: string,
+  supabaseKey: string,
+  projectId: string,
+  service: string,
+  operation: string,
+  cost: number
+) {
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/cost_logs`, {
+      method: "POST",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({
+        project_id: projectId,
+        service,
+        operation,
+        cost,
+        tokens_input: null,
+        tokens_output: null,
+      }),
+    });
+
+    const projectResp = await fetch(`${supabaseUrl}/rest/v1/projects?id=eq.${projectId}&select=total_ai_cost`, {
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+      },
+    });
+    const projectData = await projectResp.json();
+    const currentTotal = Number(projectData?.[0]?.total_ai_cost || 0);
+
+    await fetch(`${supabaseUrl}/rest/v1/projects?id=eq.${projectId}`, {
+      method: "PATCH",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({ total_ai_cost: currentTotal + cost }),
+    });
+
+    console.log(`Logged AI cost: ${service} - $${cost.toFixed(4)}`);
+  } catch (error) {
+    console.error("Failed to log AI cost:", error);
+  }
+}
+
+async function downloadImage(url: string, name: string): Promise<DownloadedImage | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`Failed to download image from ${url}: ${response.status}`);
+      return null;
+    }
+    
+    const contentType = response.headers.get("content-type") || "image/png";
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    return { name, bytes: uint8Array, mimeType: contentType };
+  } catch (error) {
+    console.error(`Error downloading image from ${url}:`, error);
+    return null;
+  }
+}
  
  serve(async (req) => {
    if (req.method === "OPTIONS") {
@@ -326,24 +380,34 @@
      const imageUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
      console.log(`Image uploaded: ${imageUrl}`);
      
-     // Update scene record with the new image URL and set status to "complete"
-     const { error: updateError } = await supabase
-       .from("scenes")
-       .update({
-         image_url: imageUrl,
-          image_status: "done",
-       })
-       .eq("id", scene_id);
-     
-     if (updateError) {
-       console.error("Failed to update scene:", updateError);
-       return new Response(
-         JSON.stringify({ error: "Failed to update scene", details: updateError.message }),
-         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-       );
-     }
-     
-     console.log(`Scene ${scene_id} updated successfully`);
+      // Log AI cost - gpt-image-1 medium quality: $0.04 per image
+      await logAICost(
+        supabaseUrl,
+        supabaseServiceKey,
+        scene.project_id,
+        "openai-gpt-image-1",
+        `Generate scene ${scene_id.substring(0, 8)} image`,
+        0.04
+      );
+      
+      // Update scene record with the new image URL and set status to "complete"
+      const { error: updateError } = await supabase
+        .from("scenes")
+        .update({
+          image_url: imageUrl,
+           image_status: "done",
+        })
+        .eq("id", scene_id);
+      
+      if (updateError) {
+        console.error("Failed to update scene:", updateError);
+        return new Response(
+          JSON.stringify({ error: "Failed to update scene", details: updateError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      console.log(`Scene ${scene_id} updated successfully`);
      
      return new Response(
        JSON.stringify({

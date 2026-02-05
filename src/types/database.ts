@@ -16,6 +16,7 @@ export interface Project {
   lyrics: string | null;
   timestamps: TimestampEntry[] | null;
   status: ProjectStatus;
+  total_ai_cost: number;
   created_at: string;
 }
 

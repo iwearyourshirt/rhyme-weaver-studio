@@ -10,6 +10,7 @@ function mapProject(data: {
   lyrics: string | null;
   timestamps: Json | null;
   status: string;
+  total_ai_cost: number | null;
   created_at: string;
 }): Project {
   let timestamps: TimestampEntry[] | null = null;
@@ -17,9 +18,14 @@ function mapProject(data: {
     timestamps = data.timestamps as unknown as TimestampEntry[];
   }
   return {
-    ...data,
+    id: data.id,
+    name: data.name,
+    audio_url: data.audio_url,
+    lyrics: data.lyrics,
     status: data.status as ProjectStatus,
     timestamps,
+    total_ai_cost: Number(data.total_ai_cost || 0),
+    created_at: data.created_at,
   };
 }
 
