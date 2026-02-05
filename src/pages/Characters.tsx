@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, ArrowRight, Star, Trash2, Wand2, Loader2, RefreshCw } from 'lucide-react';
+import { Plus, ArrowRight, Star, Trash2, Wand2, Loader2, RefreshCw, ZoomIn, RotateCcw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -35,6 +36,13 @@ import { useDebug } from '@/contexts/DebugContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+interface PreviewImage {
+  url: string;
+  characterId: string;
+  characterName: string;
+  isPrimary: boolean;
+}
+
 export default function Characters() {
   const { projectId } = useParams();
   const navigate = useNavigate();
@@ -50,6 +58,8 @@ export default function Characters() {
   const [newCharName, setNewCharName] = useState('');
   const [newCharDesc, setNewCharDesc] = useState('');
   const [generatingCharId, setGeneratingCharId] = useState<string | null>(null);
+  const [generatingAnglesCharId, setGeneratingAnglesCharId] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
 
   useEffect(() => {
     setCurrentPage('Characters');
@@ -132,13 +142,85 @@ export default function Characters() {
     }
   };
 
+  const handleGenerateConsistentAngles = async (characterId: string) => {
+    const character = characters?.find((c) => c.id === characterId);
+    if (!character?.primary_image_url) {
+      toast.error('Please set a primary image first');
+      return;
+    }
+
+    setGeneratingAnglesCharId(characterId);
+    
+    try {
+      const requestPayload = {
+        character_name: character.name,
+        character_description: character.description,
+        primary_image_url: character.primary_image_url,
+      };
+      
+      console.log('Calling generate-consistent-angles edge function...');
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-consistent-angles`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify(requestPayload),
+        }
+      );
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Angle generation failed');
+      }
+
+      logApiCall('Generate Consistent Angles', requestPayload, data);
+      
+      // Append new images to existing ones, keeping primary first
+      const existingImages = character.reference_images || [];
+      const newImages = [character.primary_image_url, ...data.images.filter((img: string) => img !== character.primary_image_url)];
+      const allImages = [...new Set([...newImages, ...existingImages])];
+      
+      await updateCharacter.mutateAsync({
+        id: characterId,
+        projectId: projectId!,
+        updates: {
+          reference_images: allImages,
+        },
+      });
+      
+      toast.success('Consistent angle images generated!');
+    } catch (error) {
+      console.error('Angle generation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Angle generation failed';
+      logApiCall('Generate Consistent Angles (Error)', { characterId }, { error: errorMessage });
+      toast.error(errorMessage);
+    } finally {
+      setGeneratingAnglesCharId(null);
+    }
+  };
+
   const handleSetPrimary = async (characterId: string, imageUrl: string) => {
     await updateCharacter.mutateAsync({
       id: characterId,
       projectId: projectId!,
       updates: { primary_image_url: imageUrl },
     });
+    setPreviewImage(null);
     toast.success('Primary image set!');
+  };
+
+  const openImagePreview = (
+    url: string,
+    characterId: string,
+    characterName: string,
+    isPrimary: boolean
+  ) => {
+    setPreviewImage({ url, characterId, characterName, isPrimary });
   };
 
   const handleContinue = async () => {
@@ -289,11 +371,10 @@ export default function Characters() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
                       {character.reference_images.map((img, idx) => (
-                        <button
+                        <div
                           key={idx}
-                          onClick={() => handleSetPrimary(character.id, img)}
                           className={cn(
-                            'relative aspect-square rounded-lg overflow-hidden border-2 transition-colors',
+                            'relative aspect-square rounded-lg overflow-hidden border-2 transition-colors group/image',
                             character.primary_image_url === img
                               ? 'border-primary'
                               : 'border-transparent hover:border-muted-foreground/50'
@@ -309,23 +390,58 @@ export default function Characters() {
                               <Star className="h-3 w-3 text-primary-foreground fill-current" />
                             </div>
                           )}
-                        </button>
+                          {/* Hover overlay with zoom button */}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="gap-1"
+                              onClick={() => openImagePreview(
+                                img,
+                                character.id,
+                                character.name,
+                                character.primary_image_url === img
+                              )}
+                            >
+                              <ZoomIn className="h-3 w-3" />
+                              View
+                            </Button>
+                          </div>
+                        </div>
                       ))}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-2"
-                      onClick={() => handleGenerateImages(character.id)}
-                      disabled={generatingCharId === character.id}
-                    >
-                      {generatingCharId === character.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4" />
+                    <div className="flex gap-2">
+                      {character.primary_image_url && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="flex-1 gap-2"
+                          onClick={() => handleGenerateConsistentAngles(character.id)}
+                          disabled={generatingAnglesCharId === character.id}
+                        >
+                          {generatingAnglesCharId === character.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RotateCcw className="h-4 w-4" />
+                          )}
+                          {generatingAnglesCharId === character.id ? 'Generating...' : 'Generate Angles'}
+                        </Button>
                       )}
-                      {generatingCharId === character.id ? 'Regenerating...' : 'Regenerate Images'}
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-2"
+                        onClick={() => handleGenerateImages(character.id)}
+                        disabled={generatingCharId === character.id}
+                      >
+                        {generatingCharId === character.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                        {generatingCharId === character.id ? 'Regenerating...' : 'New Set'}
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <Button
@@ -359,6 +475,53 @@ export default function Characters() {
           <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Image Preview Dialog */}
+      <Dialog open={!!previewImage} onOpenChange={(open) => !open && setPreviewImage(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {previewImage?.characterName}
+              {previewImage?.isPrimary && (
+                <span className="inline-flex items-center gap-1 text-sm font-normal text-primary">
+                  <Star className="h-4 w-4 fill-current" />
+                  Primary
+                </span>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {previewImage?.isPrimary 
+                ? 'This is the primary reference image for this character.'
+                : 'Click "Set as Primary" to use this as the main reference image.'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="relative aspect-square w-full max-h-[60vh] overflow-hidden rounded-lg bg-muted">
+            {previewImage && (
+              <img
+                src={previewImage.url}
+                alt={`${previewImage.characterName} preview`}
+                className="w-full h-full object-contain"
+              />
+            )}
+          </div>
+          
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPreviewImage(null)}>
+              Close
+            </Button>
+            {previewImage && !previewImage.isPrimary && (
+              <Button 
+                onClick={() => handleSetPrimary(previewImage.characterId, previewImage.url)}
+                className="gap-2"
+              >
+                <Star className="h-4 w-4" />
+                Set as Primary
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

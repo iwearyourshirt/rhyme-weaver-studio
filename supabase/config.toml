@@ -5,3 +5,6 @@
  
  [functions.generate-character-images]
  verify_jwt = false
+
+[functions.generate-consistent-angles]
+verify_jwt = false
