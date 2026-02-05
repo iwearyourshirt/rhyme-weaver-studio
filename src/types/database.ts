@@ -2,6 +2,7 @@
 
 export type ProjectStatus = 'setup' | 'characters' | 'storyboard' | 'images' | 'videos' | 'export';
 export type GenerationStatus = 'pending' | 'generating' | 'done' | 'failed';
+export type ShotType = 'wide' | 'medium' | 'close-up' | 'extreme-close-up' | 'two-shot' | 'over-shoulder';
 
 export interface TimestampEntry {
   start: number;
@@ -40,6 +41,7 @@ export interface Scene {
   lyric_snippet: string;
   scene_description: string;
   characters_in_scene: string[];
+  shot_type: ShotType;
   image_prompt: string;
   animation_prompt: string;
   image_url: string | null;

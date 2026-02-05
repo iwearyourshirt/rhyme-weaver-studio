@@ -144,6 +144,7 @@ export type Database = {
           project_id: string
           scene_description: string
           scene_number: number
+          shot_type: string
           start_time: number
           video_error: string | null
           video_request_id: string | null
@@ -164,6 +165,7 @@ export type Database = {
           project_id: string
           scene_description: string
           scene_number: number
+          shot_type?: string
           start_time: number
           video_error?: string | null
           video_request_id?: string | null
@@ -184,6 +186,7 @@ export type Database = {
           project_id?: string
           scene_description?: string
           scene_number?: number
+          shot_type?: string
           start_time?: number
           video_error?: string | null
           video_request_id?: string | null
