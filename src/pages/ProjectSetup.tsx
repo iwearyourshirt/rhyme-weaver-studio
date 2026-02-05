@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Upload, Play, Pause, Save, Wand2 } from 'lucide-react';
+import { Upload, Play, Pause, Save, Wand2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -74,21 +74,61 @@ export default function ProjectSetup() {
   };
 
   const handleTranscribe = async () => {
+    if (!project?.audio_url) {
+      toast.error('Please upload an audio file first');
+      return;
+    }
+
     setIsTranscribing(true);
-    // Placeholder - will connect to transcription API later
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    
+    try {
+      const requestPayload = { audio_url: project.audio_url };
+      
+      console.log('Calling transcribe-audio edge function...');
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify(requestPayload),
+        }
+      );
 
-    const mockTimestamps: TimestampEntry[] = [
-      { start: 0, end: 5, text: 'Twinkle twinkle little star' },
-      { start: 5, end: 10, text: 'How I wonder what you are' },
-      { start: 10, end: 15, text: 'Up above the world so high' },
-      { start: 15, end: 20, text: 'Like a diamond in the sky' },
-    ];
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Transcription failed');
+      }
 
-    setTimestamps(mockTimestamps);
-    logApiCall('Transcribe Audio', { audio_url: project?.audio_url }, mockTimestamps);
-    toast.success('Transcription complete! (Demo data)');
-    setIsTranscribing(false);
+      logApiCall('Transcribe Audio', requestPayload, data);
+      
+      // Update local state with transcription results
+      setTimestamps(data.timestamps);
+      
+      // Save to database
+      if (projectId) {
+        await updateProject.mutateAsync({
+          id: projectId,
+          updates: {
+            lyrics: data.text,
+            timestamps: data.timestamps,
+          },
+        });
+      }
+      
+      toast.success('Transcription complete!');
+    } catch (error) {
+      console.error('Transcription error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Transcription failed';
+      logApiCall('Transcribe Audio (Error)', { audio_url: project.audio_url }, { error: errorMessage });
+      toast.error(errorMessage);
+    } finally {
+      setIsTranscribing(false);
+    }
   };
 
   const handleTimestampChange = (
@@ -216,8 +256,12 @@ export default function ProjectSetup() {
                   disabled={isTranscribing}
                   className="gap-2"
                 >
-                  <Wand2 className="h-4 w-4" />
-                  {isTranscribing ? 'Transcribing...' : 'Transcribe'}
+                  {isTranscribing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-4 w-4" />
+                  )}
+                  {isTranscribing ? 'Transcribing...' : 'Transcribe Audio'}
                 </Button>
               </div>
             </div>
