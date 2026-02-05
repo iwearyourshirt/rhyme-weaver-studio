@@ -6,14 +6,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const FELTED_STYLE_PREFIX = `Professional needle-felted wool character for a stop-motion animated children's show. High-quality handcrafted felted wool figure with warm personality. Oval egg-shaped face that is slightly narrow with a soft round chin. Thin delicate curved eyebrow lines made from single strands of darker wool. Small solid black glossy bead eyes with no whites visible, set close together and positioned in the lower half of the face. A small but clearly visible rounded nose bump. A small gentle subtle smile, not wide. Smooth uniform cream-colored felted wool skin with very faint barely-there freckles. Hair is compact tightly-packed wool fiber clumps with minimal stray fibers. Body has soft natural child-like proportions. Chunky brown wool boots that connect directly to the dress hem with minimal leg visible. Clothing has minimal simple embroidery, just one small flower. Photographed with a macro lens, shallow depth of field, warm golden-hour natural light, soft green bokeh background.`;
+const FELTED_STYLE_PREFIX = `Professional needle-felted wool character for a stop-motion animated children's show. High-quality handcrafted felted wool figure with visible wool fiber texture. Photographed with a macro lens, shallow depth of field, warm golden-hour natural light, soft green bokeh background. Always show the full character from top to bottom, never cropped.`;
 
-// 4 angle variations: side, back, expressive faces
+// 3 angle variations: side profile, three-quarter back, and back view
 const ANGLE_SUFFIXES = [
-  "Side profile view of the EXACT same felted doll character, showing the profile of the face, same wool colors, same outfit, same hair style. Full body visible from head to toe.",
-  "Back view of the EXACT same felted doll character, showing the back of the head and outfit details from behind. Same wool colors and proportions. Full body visible.",
-  "The EXACT same felted doll character with a happy excited expression, eyes slightly wider, bigger smile showing joy. Same outfit and colors. Upper body and face clearly visible.",
-  "The EXACT same felted doll character with a curious thoughtful expression, head tilted slightly, gentle wondering look. Same outfit and colors. Upper body and face clearly visible.",
+  "Same exact character shown from the left side profile view.",
+  "Same exact character shown from a three-quarter back view, looking over shoulder.",
+  "Same exact character shown from directly behind.",
 ];
 
 interface OpenAIImageResponse {
@@ -87,7 +86,7 @@ serve(async (req) => {
 
     // Generate all angle images in parallel using OpenAI image edit
     const imagePromises = ANGLE_SUFFIXES.map(async (suffix, index) => {
-      const fullPrompt = `${FELTED_STYLE_PREFIX}\n\nThis character is ${character_name}, ${character_description}\n\nIMPORTANT: Generate the EXACT same felted doll with identical wool colors, outfit details, proportions, and design as shown in the reference image.\n\n${suffix}`;
+      const fullPrompt = `${FELTED_STYLE_PREFIX}\n\n${character_description}\n\n${suffix}`;
       
       console.log(`Generating angle ${index + 1}/${ANGLE_SUFFIXES.length}...`);
       console.log(`Full prompt: ${fullPrompt}`);
