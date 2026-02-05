@@ -150,12 +150,12 @@ export default function ImageGeneration() {
         if (isNetworkishInvokeError(error.message)) {
           const statusRow = await verifyIfGenerationStartedOrFinished();
           if (statusRow) {
-            // If done, clear generating flag so button re-enables.
-            // If still generating, realtime/refetch will handle it.
+            // If done, clear generating flag so button re-enables and notify user.
             if (statusRow.image_status === 'done') {
               clearGeneratingFlag();
+              toast.success(`Scene ${statusRow.scene_number} image generated`);
             }
-            toast.info(`Connection hiccup — scene ${statusRow.scene_number} is ${statusRow.image_status}.`);
+            // If generating, silently continue — realtime will handle the rest.
             return;
           }
         }
@@ -176,8 +176,9 @@ export default function ImageGeneration() {
         if (statusRow) {
           if (statusRow.image_status === 'done') {
             clearGeneratingFlag();
+            toast.success(`Scene ${statusRow.scene_number} image generated`);
           }
-          toast.info(`Connection hiccup — scene ${statusRow.scene_number} is ${statusRow.image_status}.`);
+          // If generating, silently continue — realtime will handle the rest.
           return;
         }
         toast.error('Network error while starting generation. Please retry.');
