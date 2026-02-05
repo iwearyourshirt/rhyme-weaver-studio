@@ -11,8 +11,6 @@ const FELTED_STYLE_PREFIX = `Needle-felted wool doll in kawaii chibi proportions
  const POSE_SUFFIXES = [
   "Front view of the felted doll, full body visible, standing on felted wool grass.",
   "The felted doll shown from a slightly elevated angle, upper body and face clearly visible, soft blurred background.",
-  "The felted doll in a gentle action pose, arms slightly raised, three-quarter view, standing on felted surface.",
-  "Extreme close-up macro shot of the felted doll's face, showing wool fiber texture detail, black bead eyes, shallow depth of field.",
  ];
  
 interface OpenAIImageResponse {
@@ -64,6 +62,9 @@ interface OpenAIImageResponse {
     }
  
      console.log("Generating images for character:", character_name);
+    
+    // Generate timestamp for cache-busting
+    const timestamp = Date.now();
  
     const basePrompt = `${FELTED_STYLE_PREFIX}\n\nThis character is ${character_name}, ${character_description}`;
  
@@ -110,7 +111,7 @@ interface OpenAIImageResponse {
        const binaryData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
        
        // Upload to Supabase storage
-       const filePath = `${project_id}/${character_id}/${index + 1}.png`;
+       const filePath = `${project_id}/${character_id}/${timestamp}_${index + 1}.png`;
        console.log(`Uploading image ${index + 1} to storage: ${filePath}`);
        
        const { error: uploadError } = await supabase.storage
