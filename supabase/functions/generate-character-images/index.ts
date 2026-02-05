@@ -5,7 +5,7 @@
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
  };
  
-const FELTED_STYLE_PREFIX = `Miniature needle-felted wool doll, photographed with a macro lens with shallow depth of field. The character is a tiny handmade figure made entirely of felted wool fibers with visible fuzzy texture. Black glass bead eyes, soft rounded proportions, stubby short legs, oversized round head. The entire scene is made of felt and wool materials including the ground, grass, and background elements. Warm natural lighting as if photographed on a crafting table near a window. The aesthetic looks like a real physical stop-motion puppet that you could hold in your hand. Shot with a DSLR camera, f/2.8 aperture, soft bokeh background.`;
+const FELTED_STYLE_PREFIX = `Needle-felted wool doll, miniature figure photography. Chunky rounded proportions with oversized head, stubby legs, simple dot eyes, tiny subtle smile. Entirely made of matte felted wool fibers with visible fuzzy fiber texture. Plain soft-focus background. Macro lens, shallow depth of field, warm window lighting. Looks like a real handmade wool toy photographed on a table.`;
  
  const POSE_SUFFIXES = [
   "Front view of the felted doll, full body visible, standing on felted wool grass.",
@@ -65,7 +65,7 @@ const FELTED_STYLE_PREFIX = `Miniature needle-felted wool doll, photographed wit
         "Authorization": `Key ${cleanApiKey}`,
       });
       
-       const response = await fetch("https://fal.run/fal-ai/flux/schnell", {
+      const response = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
          method: "POST",
         headers: requestHeaders,
          body: JSON.stringify({
