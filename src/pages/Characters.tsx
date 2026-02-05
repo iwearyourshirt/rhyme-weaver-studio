@@ -106,6 +106,10 @@ export default function Characters() {
       
       console.log('Calling generate-character-images edge function...');
       
+      // Use AbortController with 90 second timeout (image generation takes 20-30s per image)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
+      
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-character-images`,
         {
@@ -115,8 +119,11 @@ export default function Characters() {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify(requestPayload),
+          signal: controller.signal,
         }
       );
+      
+      clearTimeout(timeoutId);
 
       const data = await response.json();
       
@@ -144,9 +151,14 @@ export default function Characters() {
       toast.success('Reference images generated successfully!');
     } catch (error) {
       console.error('Image generation error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Image generation failed';
-      logApiCall('Generate Reference Images (Error)', { characterId }, { error: errorMessage });
-      toast.error(errorMessage);
+      // Handle abort specifically
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.error('Request timed out. Image generation may still be in progress.');
+      } else {
+        const errorMessage = error instanceof Error ? error.message : 'Image generation failed';
+        logApiCall('Generate Reference Images (Error)', { characterId }, { error: errorMessage });
+        toast.error(errorMessage);
+      }
     } finally {
       setGeneratingCharId(null);
     }
