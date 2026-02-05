@@ -25,8 +25,10 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Estimated generation time in seconds (LTX Video 2.0 Fast: ~10-30 seconds)
-const ESTIMATED_GENERATION_TIME = 25;
+// LTX Video 2.0 Fast timing: typically 10-30 seconds
+// We use a base estimate of 20s with adaptive adjustment
+const BASE_GENERATION_TIME = 20;
+const MAX_GENERATION_TIME = 45; // Cap for edge cases
 
 export function VideoSceneCard({
   scene,
@@ -106,20 +108,32 @@ export function VideoSceneCard({
   };
 
   const isActuallyGenerating = isGenerating || scene.video_status === 'generating';
-  const progressPercent = Math.min((elapsedTime / ESTIMATED_GENERATION_TIME) * 100, 95);
   const canGenerate = scene.image_status === 'done' && scene.image_url;
 
-  const formatElapsed = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  // Adaptive progress calculation - slows down as it approaches completion
+  const getAdaptiveProgress = () => {
+    if (elapsedTime < BASE_GENERATION_TIME) {
+      // Normal progress up to base time (0-80%)
+      return (elapsedTime / BASE_GENERATION_TIME) * 80;
+    } else if (elapsedTime < MAX_GENERATION_TIME) {
+      // Slow progress from 80% to 95% for longer generations
+      const overtime = elapsedTime - BASE_GENERATION_TIME;
+      const overtimeMax = MAX_GENERATION_TIME - BASE_GENERATION_TIME;
+      return 80 + (overtime / overtimeMax) * 15;
+    }
+    return 95; // Cap at 95%
   };
 
-  const getEstimatedRemaining = () => {
-    const remaining = Math.max(ESTIMATED_GENERATION_TIME - elapsedTime, 0);
-    if (remaining <= 0) return 'Almost done...';
-    if (remaining < 10) return `~${remaining}s remaining`;
-    return `~${Math.ceil(remaining / 5) * 5}s remaining`;
+  const progressPercent = getAdaptiveProgress();
+
+  const getTimeDisplay = () => {
+    if (elapsedTime < BASE_GENERATION_TIME) {
+      const remaining = BASE_GENERATION_TIME - elapsedTime;
+      return `~${remaining}s remaining`;
+    } else if (elapsedTime < MAX_GENERATION_TIME) {
+      return 'Finishing up...';
+    }
+    return 'Almost done...';
   };
 
   return (
@@ -170,10 +184,10 @@ export function VideoSceneCard({
               <p className="text-sm font-medium text-foreground mb-2">
                 {isCancelling ? 'Cancelling...' : 'Generating video...'}
               </p>
-              <Progress value={initiatedThisSessionRef.current ? progressPercent : 50} className="w-full max-w-[120px] h-1.5 mb-2" />
-              <p className="text-xs text-muted-foreground mb-3">
+              <Progress value={initiatedThisSessionRef.current ? progressPercent : 50} className="w-full max-w-[160px] h-2 mb-2" />
+              <p className="text-xs text-muted-foreground mb-3 text-center">
                 {initiatedThisSessionRef.current 
-                  ? `${formatElapsed(elapsedTime)} elapsed • ${getEstimatedRemaining()}`
+                  ? <><span className="font-medium">{elapsedTime}s</span> elapsed • {getTimeDisplay()}</>
                   : 'Generation in progress...'}
               </p>
               {/* Cancel button */}
