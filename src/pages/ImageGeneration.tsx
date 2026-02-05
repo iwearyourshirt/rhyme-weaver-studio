@@ -11,6 +11,7 @@ import { useDebug } from '@/contexts/DebugContext';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { SceneCard } from '@/components/image-generation/SceneCard';
+import type { ShotType } from '@/types/database';
 
 export default function ImageGeneration() {
   const { projectId } = useParams();
@@ -39,14 +40,28 @@ export default function ImageGeneration() {
     if (!scenes) return;
 
     scenes.forEach((scene) => {
-      // If scene is now done and we were generating it
-      if (scene.image_status === 'done' && generatingIds.has(scene.id)) {
-        // Only show toast once per scene completion
-        if (!toastShownRef.current.has(scene.id)) {
-          toastShownRef.current.add(scene.id);
+      const isGeneratingThis = generatingIds.has(scene.id);
+      if (!isGeneratingThis) return;
+
+      if (scene.image_status === 'done') {
+        const toastKey = `${scene.id}:done`;
+        if (!toastShownRef.current.has(toastKey)) {
+          toastShownRef.current.add(toastKey);
           toast.success(`Scene ${scene.scene_number} image generated`);
         }
-        // Clear from generating set
+        setGeneratingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(scene.id);
+          return next;
+        });
+      }
+
+      if (scene.image_status === 'failed') {
+        const toastKey = `${scene.id}:failed`;
+        if (!toastShownRef.current.has(toastKey)) {
+          toastShownRef.current.add(toastKey);
+          toast.error(`Scene ${scene.scene_number} failed to generate`);
+        }
         setGeneratingIds((prev) => {
           const next = new Set(prev);
           next.delete(scene.id);
@@ -58,7 +73,8 @@ export default function ImageGeneration() {
 
   // Reset toast tracking when starting new generations
   const clearToastTracking = useCallback((sceneId: string) => {
-    toastShownRef.current.delete(sceneId);
+    toastShownRef.current.delete(`${sceneId}:done`);
+    toastShownRef.current.delete(`${sceneId}:failed`);
   }, []);
 
   // Count approved scenes (not just "done" status)
@@ -66,41 +82,103 @@ export default function ImageGeneration() {
   const totalCount = scenes?.length || 0;
   const allApproved = approvedCount === totalCount && totalCount > 0;
 
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  const fetchSceneStatus = async (sceneId: string) => {
+    const { data, error } = await supabase
+      .from('scenes')
+      .select('image_status, image_url, scene_number')
+      .eq('id', sceneId)
+      .single();
+
+    if (error) throw error;
+    return data as { image_status: string; image_url: string | null; scene_number: number };
+  };
+
+  const isNetworkishInvokeError = (message: string | undefined) => {
+    const m = (message || '').toLowerCase();
+    return (
+      m.includes('failed to send a request') ||
+      m.includes('failed to fetch') ||
+      m.includes('networkerror')
+    );
+  };
+
   const generateImage = async (sceneId: string) => {
     // Clear any previous toast tracking for this scene
     clearToastTracking(sceneId);
     setGeneratingIds((prev) => new Set(prev).add(sceneId));
 
-    try {
-      const requestPayload = { scene_id: sceneId };
-      
-      console.log('Generating scene image:', requestPayload);
-      
-      const { data, error } = await supabase.functions.invoke('generate-scene-image', {
-        body: requestPayload,
-      });
-      
-      if (error) {
-        console.error('Edge function error:', error);
-        logApiCall('Generate Scene Image', requestPayload, { error: error.message });
-        toast.error(`Failed to generate image: ${error.message}`);
-        setGeneratingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(sceneId);
-          return next;
-        });
-      } else {
-        logApiCall('Generate Scene Image', requestPayload, data);
-        // Success will be handled by the useEffect watching scenes
-      }
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      toast.error('An unexpected error occurred');
+    const requestPayload = { scene_id: sceneId };
+
+    const clearGeneratingFlag = () => {
       setGeneratingIds((prev) => {
         const next = new Set(prev);
         next.delete(sceneId);
         return next;
       });
+    };
+
+    const verifyIfGenerationStartedOrFinished = async () => {
+      // If the request reached the backend but the response got dropped,
+      // the DB will show generating/done shortly after.
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await sleep(1200 + attempt * 800);
+        try {
+          const statusRow = await fetchSceneStatus(sceneId);
+          if (statusRow.image_status === 'generating' || statusRow.image_status === 'done') {
+            return statusRow;
+          }
+        } catch {
+          // Ignore status fetch errors; we’ll fall back to showing an error.
+        }
+      }
+      return null;
+    };
+
+    try {
+      console.log('Generating scene image:', requestPayload);
+
+      const { data, error } = await supabase.functions.invoke('generate-scene-image', {
+        body: requestPayload,
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        logApiCall('Generate Scene Image', requestPayload, { error: error.message });
+
+        if (isNetworkishInvokeError(error.message)) {
+          const statusRow = await verifyIfGenerationStartedOrFinished();
+          if (statusRow) {
+            // Treat as success/in-progress; realtime/refetch will update UI.
+            toast.info(`Connection hiccup — scene ${statusRow.scene_number} is ${statusRow.image_status}.`);
+            return;
+          }
+        }
+
+        toast.error(`Failed to generate image: ${error.message}`);
+        clearGeneratingFlag();
+        return;
+      }
+
+      logApiCall('Generate Scene Image', requestPayload, data);
+      // Success will be handled by the useEffect watching scenes
+    } catch (err) {
+      console.error('Unexpected error:', err);
+
+      const message = err instanceof Error ? err.message : undefined;
+      if (isNetworkishInvokeError(message)) {
+        const statusRow = await verifyIfGenerationStartedOrFinished();
+        if (statusRow) {
+          toast.info(`Connection hiccup — scene ${statusRow.scene_number} is ${statusRow.image_status}.`);
+          return;
+        }
+        toast.error('Network error while starting generation. Please retry.');
+      } else {
+        toast.error('An unexpected error occurred');
+      }
+
+      clearGeneratingFlag();
     }
   };
 
@@ -146,7 +224,7 @@ export default function ImageGeneration() {
     }
   };
 
-  const handlePromptSave = async (sceneId: string, updates: { image_prompt?: string }) => {
+  const handlePromptSave = async (sceneId: string, updates: { image_prompt?: string; shot_type?: ShotType }) => {
     if (!projectId) return;
     
     await updateScene.mutateAsync({
