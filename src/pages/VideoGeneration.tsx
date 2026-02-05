@@ -25,8 +25,8 @@ export default function VideoGeneration() {
   const updateProject = useUpdateProject();
   const { setCurrentPage, setProjectData, logApiCall, updateVideoSceneStatus, setVideoModel } = useDebug();
 
-  // Enable realtime updates
-  useScenesRealtime(projectId);
+  // Enable realtime updates and get refetch function
+  const { refetchScenes } = useScenesRealtime(projectId);
 
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
@@ -85,7 +85,10 @@ export default function VideoGeneration() {
       logApiCall('Poll Video Status', { project_id: projectId }, data);
 
       // Show toasts and update debug context for completed videos
-      if (data.updates) {
+      if (data.updates && data.updates.length > 0) {
+        // Force immediate refetch to update UI
+        refetchScenes();
+        
         for (const update of data.updates) {
           const generationEndTime = Date.now();
           const startTime = generationStartTimesRef.current.get(update.scene_id);
@@ -126,7 +129,7 @@ export default function VideoGeneration() {
     } catch (error) {
       console.error('Error polling video status:', error);
     }
-  }, [projectId, logApiCall, updateVideoSceneStatus]);
+  }, [projectId, logApiCall, updateVideoSceneStatus, refetchScenes]);
 
   // Start/stop polling based on generating scenes
   useEffect(() => {
