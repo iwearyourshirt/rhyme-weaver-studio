@@ -276,7 +276,7 @@ export function VideoSceneCard({
             variant={scene.video_status === 'done' ? 'outline' : 'default'}
             className="w-full gap-1.5"
             onClick={onGenerate}
-            disabled={isActuallyGenerating || !canGenerate}
+            disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating'}
           >
             {scene.video_status === 'done' ? (
               <>
