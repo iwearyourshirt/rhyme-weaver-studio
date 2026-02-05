@@ -55,6 +55,47 @@ export type Database = {
           },
         ]
       }
+      cost_logs: {
+        Row: {
+          cost: number
+          created_at: string
+          id: string
+          operation: string
+          project_id: string
+          service: string
+          tokens_input: number | null
+          tokens_output: number | null
+        }
+        Insert: {
+          cost?: number
+          created_at?: string
+          id?: string
+          operation: string
+          project_id: string
+          service: string
+          tokens_input?: number | null
+          tokens_output?: number | null
+        }
+        Update: {
+          cost?: number
+          created_at?: string
+          id?: string
+          operation?: string
+          project_id?: string
+          service?: string
+          tokens_input?: number | null
+          tokens_output?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           audio_url: string | null
@@ -64,6 +105,7 @@ export type Database = {
           name: string
           status: string
           timestamps: Json | null
+          total_ai_cost: number
         }
         Insert: {
           audio_url?: string | null
@@ -73,6 +115,7 @@ export type Database = {
           name: string
           status?: string
           timestamps?: Json | null
+          total_ai_cost?: number
         }
         Update: {
           audio_url?: string | null
@@ -82,6 +125,7 @@ export type Database = {
           name?: string
           status?: string
           timestamps?: Json | null
+          total_ai_cost?: number
         }
         Relationships: []
       }

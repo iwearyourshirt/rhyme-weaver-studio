@@ -13,6 +13,63 @@ const corsHeaders = {
 const VIDEO_MODEL_ENDPOINT = "fal-ai/ltx-2/image-to-video/fast";
 const VIDEO_MODEL_BASE = "fal-ai/ltx-2";
 
+// LTX Video cost: $0.04/second at 1080p, 6 second clips = $0.24
+const VIDEO_COST_PER_CLIP = 0.24;
+
+// Cost logging helper
+async function logAICost(
+  supabaseUrl: string,
+  supabaseKey: string,
+  projectId: string,
+  service: string,
+  operation: string,
+  cost: number
+) {
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/cost_logs`, {
+      method: "POST",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({
+        project_id: projectId,
+        service,
+        operation,
+        cost,
+        tokens_input: null,
+        tokens_output: null,
+      }),
+    });
+
+    const projectResp = await fetch(`${supabaseUrl}/rest/v1/projects?id=eq.${projectId}&select=total_ai_cost`, {
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+      },
+    });
+    const projectData = await projectResp.json();
+    const currentTotal = Number(projectData?.[0]?.total_ai_cost || 0);
+
+    await fetch(`${supabaseUrl}/rest/v1/projects?id=eq.${projectId}`, {
+      method: "PATCH",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({ total_ai_cost: currentTotal + cost }),
+    });
+
+    console.log(`Logged AI cost: ${service} - $${cost.toFixed(4)}`);
+  } catch (error) {
+    console.error("Failed to log AI cost:", error);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -110,6 +167,16 @@ Deno.serve(async (req) => {
             const videoUrl = result.video?.url;
 
             if (videoUrl) {
+              // Log video generation cost - $0.24 per 6-second clip
+              await logAICost(
+                supabaseUrl,
+                supabaseKey,
+                project_id,
+                "fal-ltx-video-fast",
+                `Video clip scene ${scene.scene_number}`,
+                VIDEO_COST_PER_CLIP
+              );
+
               await supabase
                 .from("scenes")
                 .update({

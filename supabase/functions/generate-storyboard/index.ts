@@ -32,13 +32,77 @@
    animation_prompt: string;
  }
  
- interface OpenAIResponse {
-   choices: Array<{
-     message: {
-       content: string;
-     };
-   }>;
- }
+interface OpenAIResponse {
+  choices: Array<{
+    message: {
+      content: string;
+    };
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+// Cost logging helper - GPT-4o pricing: $0.0025/1K input, $0.01/1K output
+async function logAICost(
+  supabaseUrl: string,
+  supabaseKey: string,
+  projectId: string,
+  service: string,
+  operation: string,
+  cost: number,
+  tokensInput?: number,
+  tokensOutput?: number
+) {
+  try {
+    // Insert cost log using raw fetch to avoid type issues
+    await fetch(`${supabaseUrl}/rest/v1/cost_logs`, {
+      method: "POST",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({
+        project_id: projectId,
+        service,
+        operation,
+        cost,
+        tokens_input: tokensInput || null,
+        tokens_output: tokensOutput || null,
+      }),
+    });
+
+    // Get current total
+    const projectResp = await fetch(`${supabaseUrl}/rest/v1/projects?id=eq.${projectId}&select=total_ai_cost`, {
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+      },
+    });
+    const projectData = await projectResp.json();
+    const currentTotal = Number(projectData?.[0]?.total_ai_cost || 0);
+
+    // Update project total
+    await fetch(`${supabaseUrl}/rest/v1/projects?id=eq.${projectId}`, {
+      method: "PATCH",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({ total_ai_cost: currentTotal + cost }),
+    });
+
+    console.log(`Logged AI cost: ${service} - $${cost.toFixed(4)}`);
+  } catch (error) {
+    console.error("Failed to log AI cost:", error);
+  }
+}
  
  serve(async (req) => {
    if (req.method === "OPTIONS") {
@@ -169,23 +233,41 @@
        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
      }
  
-     const data: OpenAIResponse = await response.json();
-     console.log("OpenAI response received");
- 
-     const content = data.choices[0]?.message?.content;
-     if (!content) {
-       throw new Error("No content in OpenAI response");
-     }
- 
-     console.log("Parsing OpenAI response...");
-     const parsed = JSON.parse(content);
-     const generatedScenes: GeneratedScene[] = parsed.scenes;
- 
-     if (!generatedScenes || !Array.isArray(generatedScenes)) {
-       throw new Error("Invalid response format: expected scenes array");
-     }
- 
-     console.log(`Parsed ${generatedScenes.length} scenes`);
+      const data: OpenAIResponse = await response.json();
+      console.log("OpenAI response received");
+
+      // Log AI cost - GPT-4o: $0.0025/1K input, $0.01/1K output
+      if (data.usage) {
+        const inputCost = (data.usage.prompt_tokens / 1000) * 0.0025;
+        const outputCost = (data.usage.completion_tokens / 1000) * 0.01;
+        const totalCost = inputCost + outputCost;
+        
+        await logAICost(
+          SUPABASE_URL,
+          SUPABASE_SERVICE_ROLE_KEY,
+          project_id,
+          "openai-gpt4o",
+          "Storyboard generation",
+          totalCost,
+          data.usage.prompt_tokens,
+          data.usage.completion_tokens
+        );
+      }
+
+      const content = data.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error("No content in OpenAI response");
+      }
+
+      console.log("Parsing OpenAI response...");
+      const parsed = JSON.parse(content);
+      const generatedScenes: GeneratedScene[] = parsed.scenes;
+
+      if (!generatedScenes || !Array.isArray(generatedScenes)) {
+        throw new Error("Invalid response format: expected scenes array");
+      }
+
+      console.log(`Parsed ${generatedScenes.length} scenes`);
  
      // Delete existing scenes for this project
      const { error: deleteError } = await supabase
