@@ -7,8 +7,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// LTX Video 2.0 Fast - same model as generate-scene-video
+// LTX Video 2.0 Fast
+// Full endpoint for submission: fal-ai/ltx-2/image-to-video/fast
+// Base model for status/result queries: fal-ai/ltx-2
 const VIDEO_MODEL_ENDPOINT = "fal-ai/ltx-2/image-to-video/fast";
+const VIDEO_MODEL_BASE = "fal-ai/ltx-2";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -69,8 +72,11 @@ Deno.serve(async (req) => {
     // Poll each scene's status
     for (const scene of generatingScenes) {
       try {
-        // Correct fal.ai queue status URL format: https://queue.fal.run/{model_id}/requests/{request_id}/status
-        const statusUrl = `https://queue.fal.run/${VIDEO_MODEL_ENDPOINT}/requests/${scene.video_request_id}/status`;
+        // For models with subpaths like "fal-ai/ltx-2/image-to-video/fast",
+        // the queue status endpoint uses the BASE model path, not the full path
+        const statusUrl = `https://queue.fal.run/${VIDEO_MODEL_BASE}/requests/${scene.video_request_id}/status`;
+        
+        console.log(`Checking status at: ${statusUrl}`);
         
         const statusResponse = await fetch(statusUrl, {
           method: "GET",
@@ -80,7 +86,8 @@ Deno.serve(async (req) => {
         });
 
         if (!statusResponse.ok) {
-          console.error(`Status check failed for scene ${scene.id}: ${statusResponse.status}`);
+          const errorText = await statusResponse.text();
+          console.error(`Status check failed for scene ${scene.id}: ${statusResponse.status} - ${errorText}`);
           continue; // Don't mark as failed on network issues, just retry next poll
         }
 
@@ -88,8 +95,8 @@ Deno.serve(async (req) => {
         console.log(`Scene ${scene.scene_number} status:`, statusResult.status);
 
         if (statusResult.status === "COMPLETED") {
-          // Fetch the actual result
-          const resultUrl = `https://queue.fal.run/${VIDEO_MODEL_ENDPOINT}/requests/${scene.video_request_id}`;
+          // Fetch the actual result using the base model path
+          const resultUrl = `https://queue.fal.run/${VIDEO_MODEL_BASE}/requests/${scene.video_request_id}`;
           const resultResponse = await fetch(resultUrl, {
             method: "GET",
             headers: {

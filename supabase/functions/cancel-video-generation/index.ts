@@ -4,11 +4,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// LTX Video 2.0 Fast - same model as generate-scene-video
-const VIDEO_MODEL_ENDPOINT = "fal-ai/ltx-2/image-to-video/fast";
+// LTX Video 2.0 Fast - base model path for queue operations
+const VIDEO_MODEL_BASE = "fal-ai/ltx-2";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     // If we have a request_id, try to cancel it on fal.ai
     if (request_id) {
       try {
-        const cancelUrl = `https://queue.fal.run/${VIDEO_MODEL_ENDPOINT}/requests/${request_id}/cancel`;
+        const cancelUrl = `https://queue.fal.run/${VIDEO_MODEL_BASE}/requests/${request_id}/cancel`;
         
         const cancelResponse = await fetch(cancelUrl, {
           method: "PUT",
