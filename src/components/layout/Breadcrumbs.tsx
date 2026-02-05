@@ -1,4 +1,4 @@
- import { useParams, useLocation, Link } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
  import { ChevronRight, Home } from 'lucide-react';
  import { useProject } from '@/hooks/useProjects';
  import { projectNavItems } from './AppSidebar';
@@ -11,9 +11,15 @@
    BreadcrumbSeparator,
  } from '@/components/ui/breadcrumb';
  
+// Extract projectId from URL path like /project/:projectId/step
+function getProjectIdFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/project\/([^/]+)/);
+  return match ? match[1] : null;
+}
+
  export function Breadcrumbs() {
-   const { projectId } = useParams();
    const location = useLocation();
+  const projectId = getProjectIdFromPath(location.pathname);
    const { data: project } = useProject(projectId);
  
    // Get current step from the path

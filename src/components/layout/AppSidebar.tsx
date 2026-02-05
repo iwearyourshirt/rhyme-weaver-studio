@@ -1,5 +1,5 @@
 import { Home, Users, Layout, Image, Video, Download, Music, ChevronDown, FolderOpen } from 'lucide-react';
-import { NavLink, useParams, useLocation, Link } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -33,9 +33,15 @@ export const projectNavItems = [
   { title: 'Export', url: 'export', icon: Download, status: 'export' },
 ];
 
+// Extract projectId from URL path like /project/:projectId/step
+function getProjectIdFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/project\/([^/]+)/);
+  return match ? match[1] : null;
+}
+
 export function AppSidebar() {
-  const { projectId } = useParams();
   const location = useLocation();
+  const projectId = getProjectIdFromPath(location.pathname);
   const { data: project } = useProject(projectId);
   
   // Keep project section open when viewing a project
