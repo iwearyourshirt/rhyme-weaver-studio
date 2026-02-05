@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Plus, Folder, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Folder, Trash2, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,11 +23,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useProjects, useCreateProject, useDeleteProject } from '@/hooks/useProjects';
+import { useProjects, useCreateProject, useDeleteProject, useUpdateProject } from '@/hooks/useProjects';
 import { useDebug } from '@/contexts/DebugContext';
-import { useState } from 'react';
 import { StatusBadge } from '@/components/ui/status-badge';
 import type { ProjectStatus } from '@/types/database';
+import { toast } from 'sonner';
 
 const statusLabels: Record<ProjectStatus, string> = {
   setup: 'Setup',
@@ -43,10 +43,13 @@ export default function ProjectsList() {
   const { data: projects, isLoading } = useProjects();
   const createProject = useCreateProject();
   const deleteProject = useDeleteProject();
+  const updateProject = useUpdateProject();
   const { setCurrentPage, setProjectData } = useDebug();
   const [newProjectName, setNewProjectName] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renamingProject, setRenamingProject] = useState<{ id: string; name: string } | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   useEffect(() => {
     setCurrentPage('Projects List');
     setProjectData(projects);
@@ -62,6 +65,28 @@ export default function ProjectsList() {
 
   const handleOpenProject = (projectId: string, status: ProjectStatus) => {
     navigate(`/project/${projectId}/${status}`);
+  };
+
+  const handleOpenRenameDialog = (e: React.MouseEvent, project: { id: string; name: string }) => {
+    e.stopPropagation();
+    setRenamingProject(project);
+    setRenameValue(project.name);
+    setRenameDialogOpen(true);
+  };
+
+  const handleRenameProject = async () => {
+    if (!renamingProject || !renameValue.trim()) return;
+    try {
+      await updateProject.mutateAsync({
+        id: renamingProject.id,
+        updates: { name: renameValue.trim() },
+      });
+      toast.success('Project renamed');
+      setRenameDialogOpen(false);
+      setRenamingProject(null);
+    } catch (error) {
+      toast.error('Failed to rename project');
+    }
   };
 
   return (
@@ -150,17 +175,26 @@ export default function ProjectsList() {
                 <CardTitle className="text-lg font-medium line-clamp-1">
                   {project.name}
                 </CardTitle>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity -mt-1 -mr-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </AlertDialogTrigger>
+                <div className="flex items-center gap-1 -mt-1 -mr-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => handleOpenRenameDialog(e, project)}
+                  >
+                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </AlertDialogTrigger>
                   <AlertDialogContent onClick={(e) => e.stopPropagation()}>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Project?</AlertDialogTitle>
@@ -179,7 +213,8 @@ export default function ProjectsList() {
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
-                </AlertDialog>
+                  </AlertDialog>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
@@ -196,6 +231,33 @@ export default function ProjectsList() {
           ))}
         </div>
       )}
+
+      {/* Rename Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Project</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="rename">Project Name</Label>
+              <Input
+                id="rename"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleRenameProject()}
+              />
+            </div>
+            <Button
+              onClick={handleRenameProject}
+              disabled={!renameValue.trim() || updateProject.isPending}
+              className="w-full"
+            >
+              {updateProject.isPending ? 'Renaming...' : 'Rename'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
