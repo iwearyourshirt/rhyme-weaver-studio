@@ -1,19 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
- import { Plus, ArrowRight, Star, Trash2, Wand2, Loader2, RefreshCw, ZoomIn, RotateCcw, X, Pencil, Mountain, User } from 'lucide-react';
+ import { Plus, ArrowRight, Star, Trash2, Wand2, Loader2, RefreshCw, ZoomIn, RotateCcw, X, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
- import { Badge } from '@/components/ui/badge';
- import {
-   Select,
-   SelectContent,
-   SelectItem,
-   SelectTrigger,
-   SelectValue,
- } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -399,24 +392,34 @@ export default function Characters() {
             <Card key={character.id} className="border group flex flex-col">
               {/* Card Header - fixed height, aligned */}
               <CardHeader className="p-4 pb-0 flex flex-row items-start justify-between space-y-0">
-                <div className="space-y-1">
-                  <CardTitle className="text-sm font-medium leading-tight">{character.name}</CardTitle>
-                  <Badge 
-                    variant={character.character_type === 'environment' ? 'secondary' : 'outline'}
-                    className="text-[10px] gap-1 h-5"
-                  >
-                    {character.character_type === 'environment' ? (
-                      <>
-                        <Mountain className="h-2.5 w-2.5" />
-                        Environment
-                      </>
-                    ) : (
-                      <>
-                        <User className="h-2.5 w-2.5" />
-                        Character
-                      </>
-                    )}
-                  </Badge>
+                <div className="space-y-2">
+                  <CardTitle className="text-lg font-semibold leading-tight">{character.name}</CardTitle>
+                  {/* Simple toggle for Character/Environment */}
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "text-xs",
+                      character.character_type !== 'environment' ? "text-foreground font-medium" : "text-muted-foreground"
+                    )}>
+                      Character
+                    </span>
+                    <Switch
+                      checked={character.character_type === 'environment'}
+                      onCheckedChange={(checked) => {
+                        updateCharacter.mutate({
+                          id: character.id,
+                          projectId: projectId!,
+                          updates: { character_type: checked ? 'environment' : 'character' },
+                        });
+                      }}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                    <span className={cn(
+                      "text-xs",
+                      character.character_type === 'environment' ? "text-foreground font-medium" : "text-muted-foreground"
+                    )}>
+                      Environment
+                    </span>
+                  </div>
                 </div>
                 <div className="flex gap-0.5">
                   <Button
@@ -469,35 +472,6 @@ export default function Characters() {
 
               {/* Card Content - consistent spacing */}
               <CardContent className="p-4 pt-3 flex-1 flex flex-col gap-3">
-                {/* Type Selector */}
-                <Select
-                  value={character.character_type || 'character'}
-                  onValueChange={(value: 'character' | 'environment') => {
-                    updateCharacter.mutate({
-                      id: character.id,
-                      projectId: projectId!,
-                      updates: { character_type: value },
-                    });
-                  }}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="character">
-                      <div className="flex items-center gap-2">
-                        <User className="h-3.5 w-3.5" />
-                        <span>Character</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="environment">
-                      <div className="flex items-center gap-2">
-                        <Mountain className="h-3.5 w-3.5" />
-                        <span>Environment</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
 
                 {/* Description */}
                 <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
