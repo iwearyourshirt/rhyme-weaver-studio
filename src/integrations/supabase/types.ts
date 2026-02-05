@@ -98,32 +98,44 @@ export type Database = {
       }
       projects: {
         Row: {
+          animation_direction: string | null
           audio_url: string | null
+          cinematography_direction: string | null
           created_at: string
+          creative_brief: string | null
           id: string
           lyrics: string | null
           name: string
           status: string
+          style_direction: string | null
           timestamps: Json | null
           total_ai_cost: number
         }
         Insert: {
+          animation_direction?: string | null
           audio_url?: string | null
+          cinematography_direction?: string | null
           created_at?: string
+          creative_brief?: string | null
           id?: string
           lyrics?: string | null
           name: string
           status?: string
+          style_direction?: string | null
           timestamps?: Json | null
           total_ai_cost?: number
         }
         Update: {
+          animation_direction?: string | null
           audio_url?: string | null
+          cinematography_direction?: string | null
           created_at?: string
+          creative_brief?: string | null
           id?: string
           lyrics?: string | null
           name?: string
           status?: string
+          style_direction?: string | null
           timestamps?: Json | null
           total_ai_cost?: number
         }

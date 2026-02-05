@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Upload, Play, Pause, Save, Wand2, Loader2 } from 'lucide-react';
+import { Upload, Play, Pause, Save, Wand2, Loader2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useProject, useUpdateProject } from '@/hooks/useProjects';
 import { useDebug } from '@/contexts/DebugContext';
@@ -24,6 +24,9 @@ export default function ProjectSetup() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [timestamps, setTimestamps] = useState<TimestampEntry[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [styleDirection, setStyleDirection] = useState('');
+  const [animationDirection, setAnimationDirection] = useState('');
+  const [cinematographyDirection, setCinematographyDirection] = useState('');
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -36,6 +39,9 @@ export default function ProjectSetup() {
     if (project) {
       setProjectName(project.name);
       setTimestamps(project.timestamps || []);
+      setStyleDirection(project.style_direction || '');
+      setAnimationDirection(project.animation_direction || '');
+      setCinematographyDirection(project.cinematography_direction || '');
     }
   }, [project]);
 
@@ -141,8 +147,21 @@ export default function ProjectSetup() {
     setTimestamps(updated);
   };
 
+  const buildCreativeBrief = () => {
+    const parts: string[] = [];
+    if (styleDirection.trim()) parts.push(`Style: ${styleDirection.trim()}`);
+    if (animationDirection.trim()) parts.push(`Motion: ${animationDirection.trim()}`);
+    if (cinematographyDirection.trim()) parts.push(`Camera: ${cinematographyDirection.trim()}`);
+    return parts.join('. ') + (parts.length > 0 ? '.' : '');
+  };
+
   const handleSaveAndContinue = async () => {
     if (!projectId) return;
+
+    if (!styleDirection.trim() || !animationDirection.trim()) {
+      toast.error('Please fill in the Visual Style and Animation Feel fields');
+      return;
+    }
 
     try {
       await updateProject.mutateAsync({
@@ -151,6 +170,10 @@ export default function ProjectSetup() {
           name: projectName,
           timestamps,
           lyrics: timestamps.map((t) => t.text).join('\n'),
+          style_direction: styleDirection,
+          animation_direction: animationDirection,
+          cinematography_direction: cinematographyDirection || null,
+          creative_brief: buildCreativeBrief(),
           status: 'characters',
         },
       });
@@ -335,14 +358,56 @@ export default function ProjectSetup() {
         </Card>
       )}
 
+      {/* Creative Direction */}
+      <Card className="card-shadow">
+        <CardHeader>
+          <CardTitle>Creative Direction</CardTitle>
+          <CardDescription>
+            These guide all AI-generated images and videos in this project. Set once, applied everywhere.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="style">Visual Style *</Label>
+            <Input
+              id="style"
+              value={styleDirection}
+              onChange={(e) => setStyleDirection(e.target.value)}
+              placeholder="e.g. felted wool characters, watercolor, pixel art, claymation"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="animation">Animation Feel *</Label>
+            <Input
+              id="animation"
+              value={animationDirection}
+              onChange={(e) => setAnimationDirection(e.target.value)}
+              placeholder="e.g. stop-motion, slow and dreamy, energetic, hand-drawn"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="cinematography">Cinematography Notes</Label>
+            <Textarea
+              id="cinematography"
+              value={cinematographyDirection}
+              onChange={(e) => setCinematographyDirection(e.target.value)}
+              placeholder="e.g. vary shot distances, not every scene needs characters, cinematic framing"
+              className="min-h-[80px]"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex justify-end">
         <Button
           size="lg"
           onClick={handleSaveAndContinue}
-          disabled={updateProject.isPending}
+          disabled={updateProject.isPending || !styleDirection.trim() || !animationDirection.trim()}
           className="gap-2"
         >
-          <Save className="h-4 w-4" />
+          <ArrowRight className="h-4 w-4" />
           {updateProject.isPending ? 'Saving...' : 'Save & Continue'}
         </Button>
       </div>

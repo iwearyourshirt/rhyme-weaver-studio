@@ -18,6 +18,10 @@ export interface Project {
   timestamps: TimestampEntry[] | null;
   status: ProjectStatus;
   total_ai_cost: number;
+  style_direction: string | null;
+  animation_direction: string | null;
+  cinematography_direction: string | null;
+  creative_brief: string | null;
   created_at: string;
 }
 

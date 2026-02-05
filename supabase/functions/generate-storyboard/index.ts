@@ -6,7 +6,7 @@
    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
  };
  
- const SYSTEM_MESSAGE = `You are a storyboard director for a needle-felted wool stop-motion animated children's show. You create vivid, detailed scene descriptions that will be used to generate images and animate them into video clips. Every scene takes place in a handcrafted felted wool world. Your visual style is: Professional needle-felted wool characters and environments for a stop-motion animated children's show. High-quality handcrafted felted wool figures and backgrounds with visible wool fiber texture. Warm golden-hour natural lighting, soft bokeh backgrounds, macro photography feel.`;
+ const DEFAULT_SYSTEM_MESSAGE = `You are a storyboard director for a stop-motion animated children's show. You create vivid, detailed scene descriptions that will be used to generate images and animate them into video clips.`;
  
  interface TimestampEntry {
    start: number;
@@ -152,48 +152,59 @@ async function logAICost(
        throw new Error(`Failed to fetch project: ${projectError?.message || "Not found"}`);
      }
  
-     const timestamps = project.timestamps as TimestampEntry[] | null;
-     if (!timestamps || timestamps.length === 0) {
-       throw new Error("Project has no timestamps. Please complete project setup first.");
-     }
- 
-     console.log(`Found ${timestamps.length} timestamp entries`);
- 
-     // Fetch characters
-     const { data: characters, error: charsError } = await supabase
-       .from("characters")
-       .select("id, name, description, primary_image_url")
-       .eq("project_id", project_id);
- 
-     if (charsError) {
-       throw new Error(`Failed to fetch characters: ${charsError.message}`);
-     }
- 
-     const charList = (characters || []) as Character[];
-     console.log(`Found ${charList.length} characters`);
- 
-     // Build the user message
-     let userMessage = "Here are the characters in this video:\n\n";
-     
-     if (charList.length === 0) {
-       userMessage += "(No characters defined yet)\n\n";
-     } else {
-       for (const char of charList) {
-         userMessage += `- ${char.name}: ${char.description}`;
-         if (char.primary_image_url) {
-           userMessage += " (reference images exist)";
-         }
-         userMessage += "\n";
-       }
-       userMessage += "\n";
-     }
- 
-     userMessage += "Here are the lyrics with timestamps:\n\n";
-     for (const ts of timestamps) {
-       userMessage += `[${ts.start.toFixed(2)}s - ${ts.end.toFixed(2)}s]: "${ts.text}"\n`;
-     }
- 
-      userMessage += `\nGenerate a storyboard with one scene per lyric line. For each scene provide:
+      const timestamps = project.timestamps as TimestampEntry[] | null;
+      if (!timestamps || timestamps.length === 0) {
+        throw new Error("Project has no timestamps. Please complete project setup first.");
+      }
+
+      console.log(`Found ${timestamps.length} timestamp entries`);
+
+      // Build system message with creative direction
+      const styleDirection = project.style_direction || "professional animation";
+      const creativeBrief = project.creative_brief || "";
+      
+      let systemMessage = DEFAULT_SYSTEM_MESSAGE;
+      if (creativeBrief) {
+        systemMessage += ` The visual style for this project is: ${creativeBrief}. Use this to inform scene descriptions, camera angles, and visual details. Do not repeat the style description in every scene — assume it as the default.`;
+      } else {
+        systemMessage += ` The visual style is: ${styleDirection}.`;
+      }
+
+      // Fetch characters
+      const { data: characters, error: charsError } = await supabase
+        .from("characters")
+        .select("id, name, description, primary_image_url")
+        .eq("project_id", project_id);
+
+      if (charsError) {
+        throw new Error(`Failed to fetch characters: ${charsError.message}`);
+      }
+
+      const charList = (characters || []) as Character[];
+      console.log(`Found ${charList.length} characters`);
+
+      // Build the user message
+      let userMessage = "Here are the characters in this video:\n\n";
+      
+      if (charList.length === 0) {
+        userMessage += "(No characters defined yet)\n\n";
+      } else {
+        for (const char of charList) {
+          userMessage += `- ${char.name}: ${char.description}`;
+          if (char.primary_image_url) {
+            userMessage += " (reference images exist)";
+          }
+          userMessage += "\n";
+        }
+        userMessage += "\n";
+      }
+
+      userMessage += "Here are the lyrics with timestamps:\n\n";
+      for (const ts of timestamps) {
+        userMessage += `[${ts.start.toFixed(2)}s - ${ts.end.toFixed(2)}s]: "${ts.text}"\n`;
+      }
+
+       userMessage += `\nGenerate a storyboard with one scene per lyric line. For each scene provide:
 
 - scene_number (integer starting at 1)
 - start_time (from the timestamp)
@@ -202,23 +213,23 @@ async function logAICost(
 - scene_description (2-3 sentences describing what is visually happening in this scene, what the characters are doing, the environment, camera angle, mood)
 - characters_in_scene (array of character names that appear in this scene)
 - shot_type (one of: "wide", "medium", "close-up", "extreme-close-up", "two-shot", "over-shoulder". Vary these throughout the storyboard to create visual interest. Use wide shots for establishing scenes and environments, close-ups for emotional moments and character focus, medium shots for dialogue and action, etc.)
-- image_prompt (a complete image generation prompt that combines the felted wool style with the scene description and character descriptions. Include the shot type framing in the prompt. This should be detailed enough to generate the image standalone without any other context.)
+- image_prompt (a complete image generation prompt that combines the project's visual style with the scene description and character descriptions. Include the shot type framing in the prompt. This should be detailed enough to generate the image standalone without any other context.)
 - animation_prompt (a short description of how this scene should be animated: what moves, camera motion, character actions. Keep it to 1-2 sentences focused on the key motion.)
 
 Return the result as a JSON object with a single key "scenes" containing an array of scene objects.`;
  
-     console.log("Calling OpenAI API...");
-     console.log("System message:", SYSTEM_MESSAGE);
-     console.log("User message:", userMessage);
- 
-     const openaiPayload = {
-       model: "gpt-4o",
-       response_format: { type: "json_object" },
-       messages: [
-         { role: "system", content: SYSTEM_MESSAGE },
-         { role: "user", content: userMessage },
-       ],
-     };
+      console.log("Calling OpenAI API...");
+      console.log("System message:", systemMessage);
+      console.log("User message:", userMessage);
+
+      const openaiPayload = {
+        model: "gpt-4o",
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: userMessage },
+        ],
+      };
  
      const response = await fetch("https://api.openai.com/v1/chat/completions", {
        method: "POST",
@@ -324,7 +335,7 @@ Return the result as a JSON object with a single key "scenes" containing an arra
        JSON.stringify({
          scenes: insertedScenes,
          prompt: {
-           system: SYSTEM_MESSAGE,
+           system: systemMessage,
            user: userMessage,
          },
          raw_response: content,
