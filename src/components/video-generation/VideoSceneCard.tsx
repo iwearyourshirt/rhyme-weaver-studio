@@ -23,8 +23,8 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Estimated generation time in seconds (3-5 minutes, using 4 min as average)
-const ESTIMATED_GENERATION_TIME = 240;
+// Estimated generation time in seconds (LTX Video 2.0 Fast: ~10-30 seconds)
+const ESTIMATED_GENERATION_TIME = 25;
 
 export function VideoSceneCard({
   scene,
@@ -113,9 +113,9 @@ export function VideoSceneCard({
 
   const getEstimatedRemaining = () => {
     const remaining = Math.max(ESTIMATED_GENERATION_TIME - elapsedTime, 0);
-    const mins = Math.floor(remaining / 60);
     if (remaining <= 0) return 'Almost done...';
-    return `~${mins + 1} min remaining`;
+    if (remaining < 10) return `~${remaining}s remaining`;
+    return `~${Math.ceil(remaining / 5) * 5}s remaining`;
   };
 
   return (

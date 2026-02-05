@@ -7,7 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const FAL_MODEL_ID = "fal-ai/kling-video/v2.1/standard/image-to-video";
+// LTX Video 2.0 Fast - same model as generate-scene-video
+const VIDEO_MODEL_ENDPOINT = "fal-ai/ltx-2/image-to-video/fast";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -44,20 +45,32 @@ Deno.serve(async (req) => {
 
     if (!generatingScenes || generatingScenes.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, updates: [], message: "No scenes currently generating" }),
+        JSON.stringify({ 
+          success: true, 
+          updates: [], 
+          model: VIDEO_MODEL_ENDPOINT,
+          message: "No scenes currently generating" 
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Polling status for ${generatingScenes.length} scenes`);
+    console.log(`Polling status for ${generatingScenes.length} scenes using ${VIDEO_MODEL_ENDPOINT}`);
 
-    const updates: Array<{ scene_id: string; scene_number: number; status: string; video_url?: string; error?: string }> = [];
+    const updates: Array<{ 
+      scene_id: string; 
+      scene_number: number; 
+      status: string; 
+      video_url?: string; 
+      error?: string;
+      generation_time_ms?: number;
+    }> = [];
 
     // Poll each scene's status
     for (const scene of generatingScenes) {
       try {
         // Correct fal.ai queue status URL format: https://queue.fal.run/{model_id}/requests/{request_id}/status
-        const statusUrl = `https://queue.fal.run/${FAL_MODEL_ID}/requests/${scene.video_request_id}/status`;
+        const statusUrl = `https://queue.fal.run/${VIDEO_MODEL_ENDPOINT}/requests/${scene.video_request_id}/status`;
         
         const statusResponse = await fetch(statusUrl, {
           method: "GET",
@@ -76,7 +89,7 @@ Deno.serve(async (req) => {
 
         if (statusResult.status === "COMPLETED") {
           // Fetch the actual result
-          const resultUrl = `https://queue.fal.run/${FAL_MODEL_ID}/requests/${scene.video_request_id}`;
+          const resultUrl = `https://queue.fal.run/${VIDEO_MODEL_ENDPOINT}/requests/${scene.video_request_id}`;
           const resultResponse = await fetch(resultUrl, {
             method: "GET",
             headers: {
@@ -86,6 +99,7 @@ Deno.serve(async (req) => {
 
           if (resultResponse.ok) {
             const result = await resultResponse.json();
+            // LTX Video 2.0 returns video in result.video.url
             const videoUrl = result.video?.url;
 
             if (videoUrl) {
@@ -139,6 +153,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         updates,
+        model: VIDEO_MODEL_ENDPOINT,
         still_generating: generatingScenes.length - updates.length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

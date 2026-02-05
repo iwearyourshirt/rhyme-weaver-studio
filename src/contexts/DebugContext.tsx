@@ -13,6 +13,23 @@ interface PromptLog {
   prompts: string[];
 }
 
+interface VideoSceneStatus {
+  sceneNumber: number;
+  sceneId: string;
+  status: 'pending' | 'generating' | 'done' | 'failed';
+  requestId?: string;
+  generationStartTime?: number;
+  generationEndTime?: number;
+  videoUrl?: string;
+  error?: string;
+}
+
+interface VideoGenerationDebug {
+  model: string;
+  scenes: VideoSceneStatus[];
+  totalGenerationTimeMs: number;
+}
+
 interface DebugContextType {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
@@ -25,9 +42,19 @@ interface DebugContextType {
   promptLogs: PromptLog[];
   logPrompts: (type: string, prompts: string[]) => void;
   clearPromptLogs: () => void;
+  videoDebug: VideoGenerationDebug;
+  updateVideoSceneStatus: (scene: VideoSceneStatus) => void;
+  setVideoModel: (model: string) => void;
+  clearVideoDebug: () => void;
 }
 
 const DebugContext = createContext<DebugContextType | undefined>(undefined);
+
+const DEFAULT_VIDEO_DEBUG: VideoGenerationDebug = {
+  model: 'fal-ai/ltx-2/image-to-video/fast',
+  scenes: [],
+  totalGenerationTimeMs: 0,
+};
 
 export function DebugProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -35,6 +62,7 @@ export function DebugProvider({ children }: { children: ReactNode }) {
   const [projectData, setProjectData] = useState<unknown>(null);
   const [lastApiCall, setLastApiCall] = useState<ApiCall | null>(null);
   const [promptLogs, setPromptLogs] = useState<PromptLog[]>([]);
+  const [videoDebug, setVideoDebug] = useState<VideoGenerationDebug>(DEFAULT_VIDEO_DEBUG);
 
   const logApiCall = (type: string, request: unknown, response: unknown) => {
     setLastApiCall({
@@ -60,6 +88,38 @@ export function DebugProvider({ children }: { children: ReactNode }) {
     setPromptLogs([]);
   };
 
+  const updateVideoSceneStatus = (scene: VideoSceneStatus) => {
+    setVideoDebug((prev) => {
+      const existingIndex = prev.scenes.findIndex((s) => s.sceneId === scene.sceneId);
+      let newScenes: VideoSceneStatus[];
+      
+      if (existingIndex >= 0) {
+        newScenes = [...prev.scenes];
+        newScenes[existingIndex] = { ...newScenes[existingIndex], ...scene };
+      } else {
+        newScenes = [...prev.scenes, scene].sort((a, b) => a.sceneNumber - b.sceneNumber);
+      }
+
+      // Calculate total generation time from completed scenes
+      const totalGenerationTimeMs = newScenes.reduce((total, s) => {
+        if (s.status === 'done' && s.generationStartTime && s.generationEndTime) {
+          return total + (s.generationEndTime - s.generationStartTime);
+        }
+        return total;
+      }, 0);
+
+      return { ...prev, scenes: newScenes, totalGenerationTimeMs };
+    });
+  };
+
+  const setVideoModel = (model: string) => {
+    setVideoDebug((prev) => ({ ...prev, model }));
+  };
+
+  const clearVideoDebug = () => {
+    setVideoDebug(DEFAULT_VIDEO_DEBUG);
+  };
+
   return (
     <DebugContext.Provider
       value={{
@@ -74,6 +134,10 @@ export function DebugProvider({ children }: { children: ReactNode }) {
         promptLogs,
         logPrompts,
         clearPromptLogs,
+        videoDebug,
+        updateVideoSceneStatus,
+        setVideoModel,
+        clearVideoDebug,
       }}
     >
       {children}
