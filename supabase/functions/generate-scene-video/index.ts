@@ -1,0 +1,102 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+// Motion style suffix applied to EVERY video generation
+const MOTION_STYLE_SUFFIX = `Very slow, dreamlike camera movement. Extremely gentle and peaceful animation. Soft, calm motion. No sudden movements. Lullaby-like atmosphere. Think Studio Ghibli quiet moments.`;
+
+// fal.ai Kling 2.1 Standard endpoint
+const FAL_VIDEO_ENDPOINT = "https://queue.fal.run/fal-ai/kling-video/v2.1/standard/image-to-video";
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const FAL_API_KEY = Deno.env.get("FAL_API_KEY");
+    if (!FAL_API_KEY) {
+      throw new Error("FAL_API_KEY is not configured");
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const { scene_id, project_id, image_url, animation_prompt, scene_description } = await req.json();
+
+    if (!scene_id || !project_id || !image_url) {
+      throw new Error("Missing required fields: scene_id, project_id, image_url");
+    }
+
+    console.log(`Starting video generation for scene ${scene_id}`);
+
+    // Construct the motion prompt with our calm/peaceful style
+    const basePrompt = animation_prompt || scene_description || "";
+    const motionPrompt = `${basePrompt}. ${MOTION_STYLE_SUFFIX}`;
+
+    console.log(`Motion prompt: ${motionPrompt.substring(0, 200)}...`);
+
+    // Submit to fal.ai queue (async processing)
+    const falResponse = await fetch(FAL_VIDEO_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Authorization": `Key ${FAL_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        prompt: motionPrompt,
+        image_url: image_url,
+        duration: "5",
+        aspect_ratio: "16:9",
+      }),
+    });
+
+    if (!falResponse.ok) {
+      const errorText = await falResponse.text();
+      console.error(`fal.ai error: ${falResponse.status} - ${errorText}`);
+      throw new Error(`fal.ai API error: ${falResponse.status} - ${errorText}`);
+    }
+
+    const falResult = await falResponse.json();
+    const requestId = falResult.request_id;
+
+    console.log(`fal.ai request queued with ID: ${requestId}`);
+
+    // Update scene with request ID and generating status
+    const { error: updateError } = await supabase
+      .from("scenes")
+      .update({
+        video_status: "generating",
+        video_request_id: requestId,
+        video_error: null,
+      })
+      .eq("id", scene_id);
+
+    if (updateError) {
+      console.error("Error updating scene:", updateError);
+      throw updateError;
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        request_id: requestId,
+        message: "Video generation queued successfully",
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (error: unknown) {
+    console.error("Error in generate-scene-video:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ success: false, error: errorMessage }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

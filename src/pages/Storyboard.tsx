@@ -224,6 +224,8 @@
           image_approved: false,
           video_url: null,
           video_status: 'pending',
+          video_request_id: null,
+          video_error: null,
         });
        
        const scenesAfter = scenes

@@ -72,6 +72,8 @@ export function useUpdateScene() {
         image_approved: boolean;
         video_url: string | null;
         video_status: GenerationStatus;
+        video_request_id: string | null;
+        video_error: string | null;
         scene_number: number;
         start_time: number;
         end_time: number;

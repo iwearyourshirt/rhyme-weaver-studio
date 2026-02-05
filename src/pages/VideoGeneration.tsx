@@ -1,20 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Wand2, RefreshCw, Video, Play } from 'lucide-react';
+import { ArrowRight, Wand2, Video, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { useProject, useUpdateProject } from '@/hooks/useProjects';
 import { useScenes, useUpdateScene } from '@/hooks/useScenes';
+import { useScenesRealtime } from '@/hooks/useScenesRealtime';
 import { useDebug } from '@/contexts/DebugContext';
+import { VideoSceneCard } from '@/components/video-generation/VideoSceneCard';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
+const COST_PER_VIDEO = 0.25;
+const POLL_INTERVAL = 15000; // 15 seconds
 
 export default function VideoGeneration() {
   const { projectId } = useParams();
@@ -25,58 +24,165 @@ export default function VideoGeneration() {
   const updateProject = useUpdateProject();
   const { setCurrentPage, setProjectData, logApiCall } = useDebug();
 
+  // Enable realtime updates
+  useScenesRealtime(projectId);
+
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const toastShownRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setCurrentPage('Video Generation');
     setProjectData({ project, scenes });
   }, [setCurrentPage, setProjectData, project, scenes]);
 
+  // Calculate progress
   const doneCount = scenes?.filter((s) => s.video_status === 'done').length || 0;
+  const generatingCount = scenes?.filter((s) => s.video_status === 'generating').length || 0;
   const totalCount = scenes?.length || 0;
+  const readyToGenerateCount = scenes?.filter(
+    (s) => s.image_status === 'done' && s.image_url && s.video_status !== 'done'
+  ).length || 0;
   const allDone = doneCount === totalCount && totalCount > 0;
 
+  // Calculate estimated cost
+  const estimatedCost = (readyToGenerateCount * COST_PER_VIDEO).toFixed(2);
+
+  // Poll for video status updates
+  const pollVideoStatus = useCallback(async () => {
+    if (!projectId) return;
+
+    try {
+      const response = await supabase.functions.invoke('poll-video-status', {
+        body: { project_id: projectId },
+      });
+
+      if (response.error) {
+        console.error('Poll error:', response.error);
+        return;
+      }
+
+      const data = response.data;
+      logApiCall('Poll Video Status', { project_id: projectId }, data);
+
+      // Show toasts for completed videos
+      if (data.updates) {
+        for (const update of data.updates) {
+          if (update.status === 'done' && !toastShownRef.current.has(update.scene_id)) {
+            toastShownRef.current.add(update.scene_id);
+            toast.success(`Scene ${update.scene_number} video generated!`);
+          } else if (update.status === 'failed' && !toastShownRef.current.has(update.scene_id)) {
+            toastShownRef.current.add(update.scene_id);
+            toast.error(`Scene ${update.scene_number} failed: ${update.error || 'Unknown error'}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error polling video status:', error);
+    }
+  }, [projectId, logApiCall]);
+
+  // Start/stop polling based on generating scenes
+  useEffect(() => {
+    const hasGenerating = scenes?.some((s) => s.video_status === 'generating');
+
+    if (hasGenerating && !pollIntervalRef.current) {
+      // Start polling
+      pollIntervalRef.current = setInterval(pollVideoStatus, POLL_INTERVAL);
+      // Also poll immediately
+      pollVideoStatus();
+    } else if (!hasGenerating && pollIntervalRef.current) {
+      // Stop polling
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [scenes, pollVideoStatus]);
+
   const generateVideo = async (sceneId: string) => {
+    const scene = scenes?.find((s) => s.id === sceneId);
+    if (!scene || !scene.image_url) return;
+
     setGeneratingIds((prev) => new Set(prev).add(sceneId));
 
-    await updateScene.mutateAsync({
-      id: sceneId,
-      projectId: projectId!,
-      updates: { video_status: 'generating' },
-    });
+    try {
+      const response = await supabase.functions.invoke('generate-scene-video', {
+        body: {
+          scene_id: sceneId,
+          project_id: projectId,
+          image_url: scene.image_url,
+          animation_prompt: scene.animation_prompt,
+          scene_description: scene.scene_description,
+        },
+      });
 
-    // Placeholder - will connect to fal.ai later
-    await new Promise((resolve) => setTimeout(resolve, 3000 + Math.random() * 2000));
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
 
-    // Use a placeholder video URL (just marking as done for demo)
-    const mockVideoUrl = `https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4`;
+      logApiCall('Generate Video', { scene_id: sceneId }, response.data);
 
-    await updateScene.mutateAsync({
-      id: sceneId,
-      projectId: projectId!,
-      updates: { video_status: 'done', video_url: mockVideoUrl },
-    });
+      // Start polling if not already
+      if (!pollIntervalRef.current) {
+        pollIntervalRef.current = setInterval(pollVideoStatus, POLL_INTERVAL);
+      }
+    } catch (error) {
+      console.error('Error generating video:', error);
+      toast.error(`Failed to start video generation: ${error instanceof Error ? error.message : 'Unknown error'}`);
 
-    logApiCall('Generate Video', { sceneId }, { video_url: mockVideoUrl });
-    setGeneratingIds((prev) => {
-      const next = new Set(prev);
-      next.delete(sceneId);
-      return next;
-    });
+      // Mark as failed
+      await updateScene.mutateAsync({
+        id: sceneId,
+        projectId: projectId!,
+        updates: {
+          video_status: 'failed',
+          video_error: error instanceof Error ? error.message : 'Failed to start generation',
+        },
+      });
+    } finally {
+      setGeneratingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sceneId);
+        return next;
+      });
+    }
   };
 
   const handleGenerateAll = async () => {
     if (!scenes) return;
 
     const pendingScenes = scenes.filter(
-      (s) => s.video_status === 'pending' || s.video_status === 'failed'
+      (s) => s.image_status === 'done' && s.image_url && s.video_status !== 'done' && s.video_status !== 'generating'
     );
 
-    for (const scene of pendingScenes) {
-      await generateVideo(scene.id);
+    if (pendingScenes.length === 0) {
+      toast.info('No scenes ready to generate');
+      return;
     }
 
-    toast.success('All videos generated!');
+    setIsGeneratingAll(true);
+
+    // Submit all scenes in parallel
+    const promises = pendingScenes.map((scene) => generateVideo(scene.id));
+    await Promise.all(promises);
+
+    setIsGeneratingAll(false);
+    toast.success(`Started generating ${pendingScenes.length} videos`);
+  };
+
+  const handleUpdatePrompt = async (sceneId: string, newPrompt: string) => {
+    await updateScene.mutateAsync({
+      id: sceneId,
+      projectId: projectId!,
+      updates: { animation_prompt: newPrompt },
+    });
   };
 
   const handleContinue = async () => {
@@ -103,94 +209,65 @@ export default function VideoGeneration() {
 
   return (
     <div className="max-w-6xl mx-auto animate-fade-in space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">
             Video Generation
           </h1>
           <p className="text-muted-foreground mt-1">
-            Generate animated videos for each scene
+            Animate each scene with gentle, dreamlike motion
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Progress */}
           <div className="text-sm text-muted-foreground">
             {doneCount} / {totalCount} complete
+            {generatingCount > 0 && ` (${generatingCount} generating)`}
           </div>
           <Progress value={(doneCount / totalCount) * 100} className="w-32" />
-          <Button
-            onClick={handleGenerateAll}
-            disabled={generatingIds.size > 0 || allDone}
-            className="gap-2"
-          >
-            <Wand2 className="h-4 w-4" />
-            Generate All
-          </Button>
         </div>
       </div>
 
-      {scenes && scenes.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {scenes.map((scene) => (
-            <Card
-              key={scene.id}
-              className="card-shadow overflow-hidden group"
-            >
-              <div className="aspect-video bg-muted relative">
-                {scene.image_url ? (
-                  <img
-                    src={scene.image_url}
-                    alt={`Scene ${scene.scene_number}`}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Video className="h-12 w-12 text-muted-foreground/30" />
-                  </div>
-                )}
-                {scene.video_status === 'done' && (
-                  <div className="absolute inset-0 bg-background/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="bg-primary rounded-full p-3">
-                      <Play className="h-6 w-6 text-primary-foreground fill-current" />
-                    </div>
-                  </div>
-                )}
-                {generatingIds.has(scene.id) && (
-                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
-                  </div>
-                )}
-              </div>
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">
-                    Scene {scene.scene_number}
-                  </span>
-                  <StatusBadge status={scene.video_status} />
-                </div>
-                <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
-                  {formatTime(scene.start_time)} - {formatTime(scene.end_time)}
+      {/* Cost Estimate & Generate All */}
+      {readyToGenerateCount > 0 && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4 flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <DollarSign className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-sm font-medium">
+                  {readyToGenerateCount} scenes ready to generate
                 </p>
-                <Button
-                  size="sm"
-                  variant={scene.video_status === 'done' ? 'outline' : 'default'}
-                  className="w-full gap-1.5"
-                  onClick={() => generateVideo(scene.id)}
-                  disabled={generatingIds.has(scene.id) || scene.image_status !== 'done'}
-                >
-                  {scene.video_status === 'done' ? (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Regenerate
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="h-3.5 w-3.5" />
-                      Generate
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
+                <p className="text-xs text-muted-foreground">
+                  Estimated cost: ${estimatedCost} ({readyToGenerateCount} × ${COST_PER_VIDEO})
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleGenerateAll}
+              disabled={isGeneratingAll || generatingCount > 0}
+              className="gap-2"
+            >
+              <Wand2 className="h-4 w-4" />
+              Generate All Videos
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Scene Grid */}
+      {scenes && scenes.length > 0 ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {scenes.map((scene) => (
+            <VideoSceneCard
+              key={scene.id}
+              scene={scene}
+              projectId={projectId!}
+              isGenerating={generatingIds.has(scene.id)}
+              onGenerate={() => generateVideo(scene.id)}
+              onUpdatePrompt={(prompt) => handleUpdatePrompt(scene.id, prompt)}
+            />
           ))}
         </div>
       ) : (
@@ -207,6 +284,7 @@ export default function VideoGeneration() {
         </Card>
       )}
 
+      {/* Continue Button */}
       <div className="flex justify-end">
         <Button
           size="lg"
