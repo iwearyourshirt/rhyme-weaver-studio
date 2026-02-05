@@ -2,7 +2,8 @@
  import { useParams, useNavigate } from 'react-router-dom';
  import { ArrowRight, Wand2, GripVertical, ChevronDown, ChevronUp, Scissors, Merge, Trash2, Save, Loader2, Clock, Film, RefreshCw, ImageIcon } from 'lucide-react';
  import { Button } from '@/components/ui/button';
- import { Label } from '@/components/ui/label';
+  import { Label } from '@/components/ui/label';
+  import { PromptFeedback } from '@/components/storyboard/PromptFeedback';
  import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
  import { Textarea } from '@/components/ui/textarea';
  import { Badge } from '@/components/ui/badge';
@@ -486,24 +487,36 @@
                    </CollapsibleTrigger>
                    <CollapsibleContent className="space-y-4 pt-2">
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div className="space-y-2">
-                         <Label className="text-xs text-muted-foreground">Image Prompt</Label>
-                         <Textarea
-                           value={getEditedValue(scene, 'image_prompt')}
-                           onChange={(e) => handleLocalEdit(scene.id, 'image_prompt', e.target.value)}
-                           placeholder="Prompt for generating the scene image..."
-                           className="min-h-[100px] text-sm"
-                         />
-                       </div>
-                       <div className="space-y-2">
-                         <Label className="text-xs text-muted-foreground">Animation Prompt</Label>
-                         <Textarea
-                           value={getEditedValue(scene, 'animation_prompt')}
-                           onChange={(e) => handleLocalEdit(scene.id, 'animation_prompt', e.target.value)}
-                           placeholder="Describe how this scene should animate..."
-                           className="min-h-[100px] text-sm"
-                         />
-                       </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">Image Prompt</Label>
+                          <Textarea
+                            value={getEditedValue(scene, 'image_prompt')}
+                            onChange={(e) => handleLocalEdit(scene.id, 'image_prompt', e.target.value)}
+                            placeholder="Prompt for generating the scene image..."
+                            className="min-h-[100px] text-sm"
+                          />
+                          <PromptFeedback
+                            promptType="image"
+                            currentPrompt={getEditedValue(scene, 'image_prompt')}
+                            sceneDescription={getEditedValue(scene, 'scene_description')}
+                            onRewrite={(newPrompt) => handleLocalEdit(scene.id, 'image_prompt', newPrompt)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">Animation Prompt</Label>
+                          <Textarea
+                            value={getEditedValue(scene, 'animation_prompt')}
+                            onChange={(e) => handleLocalEdit(scene.id, 'animation_prompt', e.target.value)}
+                            placeholder="Describe how this scene should animate..."
+                            className="min-h-[100px] text-sm"
+                          />
+                          <PromptFeedback
+                            promptType="animation"
+                            currentPrompt={getEditedValue(scene, 'animation_prompt')}
+                            sceneDescription={getEditedValue(scene, 'scene_description')}
+                            onRewrite={(newPrompt) => handleLocalEdit(scene.id, 'animation_prompt', newPrompt)}
+                          />
+                        </div>
                      </div>
                    </CollapsibleContent>
                  </Collapsible>
