@@ -30,6 +30,7 @@ import type { ShotType } from '@/types/database';
 import { useScenes, useCreateScene, useUpdateScene, useDeleteScenes, useDeleteScene, useRenumberScenes } from '@/hooks/useScenes';
 import { useScenesRealtime } from '@/hooks/useScenesRealtime';
  import { useDebug } from '@/contexts/DebugContext';
+ import { supabase } from '@/integrations/supabase/client';
  import { toast } from 'sonner';
  import type { Scene } from '@/types/database';
  
@@ -99,25 +100,19 @@ export default function Storyboard() {
      try {
        const requestPayload = { project_id: projectId };
        
-       console.log('Calling generate-storyboard edge function...');
-       
-       const response = await fetch(
-         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-storyboard`,
-         {
-           method: 'POST',
-           headers: {
-             'Content-Type': 'application/json',
-             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-           },
-           body: JSON.stringify(requestPayload),
-         }
-       );
- 
-       const data = await response.json();
-       
-       if (!response.ok) {
-         throw new Error(data.error || 'Storyboard generation failed');
-       }
+        console.log('Calling generate-storyboard edge function...');
+
+        const { data, error } = await supabase.functions.invoke('generate-storyboard', {
+          body: requestPayload,
+        });
+
+        if (error) {
+          throw new Error(error.message || 'Storyboard generation failed');
+        }
+
+        if (!data) {
+          throw new Error('Storyboard generation returned no data');
+        }
  
        logApiCall('Generate Storyboard', requestPayload, data);
        

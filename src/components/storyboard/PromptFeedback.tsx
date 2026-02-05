@@ -1,8 +1,9 @@
- import { useState } from 'react';
- import { Sparkles, Loader2 } from 'lucide-react';
- import { Button } from '@/components/ui/button';
- import { Input } from '@/components/ui/input';
- import { toast } from 'sonner';
+import { useState } from 'react';
+import { Sparkles, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
  
  interface PromptFeedbackProps {
    promptType: 'image' | 'animation';
@@ -22,33 +23,27 @@
      }
  
      setIsRewriting(true);
-     try {
-       const response = await fetch(
-         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rewrite-prompt`,
-         {
-           method: 'POST',
-           headers: {
-             'Content-Type': 'application/json',
-             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-           },
-           body: JSON.stringify({
-             prompt_type: promptType,
-             current_prompt: currentPrompt,
-             scene_description: sceneDescription,
-             feedback: feedback.trim(),
-           }),
-         }
-       );
- 
-       const data = await response.json();
- 
-       if (!response.ok) {
-         throw new Error(data.error || 'Failed to rewrite prompt');
-       }
- 
-       onRewrite(data.rewritten_prompt);
-       setFeedback('');
-       toast.success(`${promptType === 'image' ? 'Image' : 'Animation'} prompt updated`);
+      try {
+        const { data, error } = await supabase.functions.invoke('rewrite-prompt', {
+          body: {
+            prompt_type: promptType,
+            current_prompt: currentPrompt,
+            scene_description: sceneDescription,
+            feedback: feedback.trim(),
+          },
+        });
+
+        if (error) {
+          throw new Error(error.message || 'Failed to rewrite prompt');
+        }
+
+        if (!data) {
+          throw new Error('No data returned');
+        }
+
+        onRewrite(data.rewritten_prompt);
+        setFeedback('');
+        toast.success(`${promptType === 'image' ? 'Image' : 'Animation'} prompt updated`);
      } catch (error) {
        console.error('Rewrite error:', error);
        toast.error(error instanceof Error ? error.message : 'Failed to rewrite prompt');
