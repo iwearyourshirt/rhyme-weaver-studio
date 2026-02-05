@@ -258,7 +258,7 @@ export default function VideoGeneration() {
 
       {/* Scene Grid */}
       {scenes && scenes.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
           {scenes.map((scene) => (
             <VideoSceneCard
               key={scene.id}
