@@ -92,6 +92,19 @@ async function downloadImage(url: string, name: string): Promise<DownloadedImage
     return null;
   }
 }
+
+// Shot type to camera framing instruction mapping
+function getShotTypeInstruction(shotType: string): string {
+  const instructions: Record<string, string> = {
+    "wide": "Frame as a wide establishing shot showing the full environment and all characters from a distance.",
+    "medium": "Frame as a medium shot from the waist up, balancing character detail with environmental context.",
+    "close-up": "Frame as a close-up shot focusing tightly on the character's face and upper body, emphasizing emotion and detail.",
+    "extreme-close-up": "Frame as an extreme close-up on a specific detail - eyes, hands, or a key object - filling the frame.",
+    "two-shot": "Frame as a two-shot with both characters prominently featured together in the frame.",
+    "over-shoulder": "Frame as an over-the-shoulder shot, viewing one character from behind another's shoulder.",
+  };
+  return instructions[shotType] || instructions["medium"];
+}
  
  serve(async (req) => {
    if (req.method === "OPTIONS") {
@@ -127,23 +140,25 @@ async function downloadImage(url: string, name: string): Promise<DownloadedImage
        );
      }
      
-     // Fetch the scene to get the image prompt, project_id, and characters_in_scene
-     const { data: scene, error: sceneError } = await supabase
-       .from("scenes")
-       .select("image_prompt, project_id, characters_in_scene")
-       .eq("id", scene_id)
-       .single();
-     
-     if (sceneError || !scene) {
-       console.error("Failed to fetch scene:", sceneError);
-       return new Response(
-         JSON.stringify({ error: "Scene not found" }),
-         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-       );
-     }
-     
-     console.log(`Image prompt: ${scene.image_prompt}`);
-     console.log(`Characters in scene: ${JSON.stringify(scene.characters_in_scene)}`);
+      // Fetch the scene to get the image prompt, project_id, characters_in_scene, and shot_type
+      const { data: scene, error: sceneError } = await supabase
+        .from("scenes")
+        .select("image_prompt, project_id, characters_in_scene, shot_type")
+        .eq("id", scene_id)
+        .single();
+      
+      if (sceneError || !scene) {
+        console.error("Failed to fetch scene:", sceneError);
+        return new Response(
+          JSON.stringify({ error: "Scene not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      const shotType = scene.shot_type || "medium";
+      console.log(`Image prompt: ${scene.image_prompt}`);
+      console.log(`Shot type: ${shotType}`);
+      console.log(`Characters in scene: ${JSON.stringify(scene.characters_in_scene)}`);
      
      // Update status to "generating"
      const { error: statusError } = await supabase
@@ -239,13 +254,15 @@ async function downloadImage(url: string, name: string): Promise<DownloadedImage
      console.log(`  - As character match: ${includedAsCharacterMatch.join(", ") || "none"}`);
      console.log(`Skipped characters: ${skippedCharacters.join(", ") || "none"}`);
      
-     // Build the prompt with reference image instructions if we have any
-     let finalPrompt = scene.image_prompt;
-     if (referenceImages.length > 0) {
-       finalPrompt = `Use the provided reference images as character and environment design guides. Match their exact appearance, proportions, colors, and style. The environment/setting reference shows the world these characters live in - use it as the backdrop. ${scene.image_prompt}`;
-     }
-     
-     console.log(`Final prompt: ${finalPrompt}`);
+      // Build the prompt with shot type framing and reference image instructions
+      const shotTypeInstruction = getShotTypeInstruction(shotType);
+      let finalPrompt = `${shotTypeInstruction} ${scene.image_prompt}`;
+      
+      if (referenceImages.length > 0) {
+        finalPrompt = `Use the provided reference images as character and environment design guides. Match their exact appearance, proportions, colors, and style. The environment/setting reference shows the world these characters live in - use it as the backdrop. ${shotTypeInstruction} ${scene.image_prompt}`;
+      }
+      
+      console.log(`Final prompt: ${finalPrompt}`);
      
      let openaiResponse: Response;
      

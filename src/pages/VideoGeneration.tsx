@@ -179,6 +179,7 @@ export default function VideoGeneration() {
           image_url: scene.image_url,
           animation_prompt: scene.animation_prompt,
           scene_description: scene.scene_description,
+          shot_type: scene.shot_type,
         },
       });
 
