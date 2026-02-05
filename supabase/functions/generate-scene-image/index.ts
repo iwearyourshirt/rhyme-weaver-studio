@@ -11,6 +11,7 @@
    id: string;
    name: string;
    primary_image_url: string | null;
+   character_type: string | null;
  }
  
  interface ReferenceImage {
@@ -107,10 +108,10 @@
        console.error("Failed to update status to generating:", statusError);
      }
      
-     // Fetch all characters for this project
+     // Fetch ALL characters for this project (we need environment chars too)
      const { data: characters, error: charsError } = await supabase
        .from("characters")
-       .select("id, name, primary_image_url")
+       .select("id, name, primary_image_url, character_type")
        .eq("project_id", scene.project_id);
      
      if (charsError) {
@@ -120,33 +121,40 @@
      const charList = (characters || []) as Character[];
      console.log(`Found ${charList.length} characters in project`);
      
-     // Match characters_in_scene to character records (case-insensitive)
+     // Determine which characters to include:
+     // 1. Environment characters ALWAYS get included
+     // 2. Regular characters only if they appear in characters_in_scene (case-insensitive)
      const charactersInScene = (scene.characters_in_scene || []) as string[];
      const referenceImages: ReferenceImage[] = [];
      const includedCharacters: string[] = [];
      const skippedCharacters: string[] = [];
+     const includedAsEnvironment: string[] = [];
+     const includedAsCharacterMatch: string[] = [];
      
-     for (const charName of charactersInScene) {
-       // Case-insensitive match
-       const matchedChar = charList.find(
-         (c) => c.name.toLowerCase() === charName.toLowerCase()
+     // Process all characters
+     for (const char of charList) {
+       const isEnvironment = char.character_type === "environment";
+       const isInScene = charactersInScene.some(
+         (name) => name.toLowerCase() === char.name.toLowerCase()
        );
        
-       if (!matchedChar) {
-         console.log(`Character "${charName}" not found in character records - skipping`);
-         skippedCharacters.push(charName);
+       // Include if it's an environment character OR if it's a regular character in the scene
+       const shouldInclude = isEnvironment || isInScene;
+       
+       if (!shouldInclude) {
+         console.log(`Character "${char.name}" is not in scene and not environment - skipping`);
          continue;
        }
        
-       if (!matchedChar.primary_image_url) {
-         console.log(`Character "${charName}" has no reference image - skipping`);
-         skippedCharacters.push(charName);
+       if (!char.primary_image_url) {
+         console.log(`Character "${char.name}" has no reference image - skipping`);
+         skippedCharacters.push(char.name);
          continue;
        }
        
        // Download and convert to base64
-       console.log(`Downloading reference image for "${charName}": ${matchedChar.primary_image_url}`);
-       const imageData = await downloadImageAsBase64(matchedChar.primary_image_url);
+       console.log(`Downloading reference image for "${char.name}": ${char.primary_image_url}`);
+       const imageData = await downloadImageAsBase64(char.primary_image_url);
        
        if (imageData) {
          referenceImages.push({
@@ -154,22 +162,44 @@
            media_type: imageData.mimeType,
            data: imageData.base64,
          });
-         includedCharacters.push(charName);
-         console.log(`Added reference image for "${charName}"`);
+         includedCharacters.push(char.name);
+         
+         if (isEnvironment) {
+           includedAsEnvironment.push(char.name);
+           console.log(`Added reference image for "${char.name}" (ENVIRONMENT - always included)`);
+         } else {
+           includedAsCharacterMatch.push(char.name);
+           console.log(`Added reference image for "${char.name}" (character match)`);
+         }
        } else {
-         console.log(`Failed to download reference image for "${charName}" - skipping`);
-         skippedCharacters.push(charName);
+         console.log(`Failed to download reference image for "${char.name}" - skipping`);
+         skippedCharacters.push(char.name);
+       }
+     }
+     
+     // Also check if any names in characters_in_scene didn't match any character record
+     for (const charName of charactersInScene) {
+       const matchedChar = charList.find(
+         (c) => c.name.toLowerCase() === charName.toLowerCase()
+       );
+       if (!matchedChar) {
+         console.log(`Character "${charName}" from scene not found in character records - skipping`);
+         if (!skippedCharacters.includes(charName)) {
+           skippedCharacters.push(charName);
+         }
        }
      }
      
      console.log(`Reference images to send: ${referenceImages.length}`);
      console.log(`Included characters: ${includedCharacters.join(", ") || "none"}`);
+     console.log(`  - As environment: ${includedAsEnvironment.join(", ") || "none"}`);
+     console.log(`  - As character match: ${includedAsCharacterMatch.join(", ") || "none"}`);
      console.log(`Skipped characters: ${skippedCharacters.join(", ") || "none"}`);
      
      // Build the prompt with reference image instructions if we have any
      let finalPrompt = scene.image_prompt;
      if (referenceImages.length > 0) {
-       finalPrompt = `Use the provided reference images as character design guides. Match their exact appearance, proportions, colors, and style. ${scene.image_prompt}`;
+       finalPrompt = `Use the provided reference images as character and environment design guides. Match their exact appearance, proportions, colors, and style. The environment/setting reference shows the world these characters live in - use it as the backdrop. ${scene.image_prompt}`;
      }
      
      console.log(`Final prompt: ${finalPrompt}`);
@@ -310,6 +340,8 @@
          reference_images_count: referenceImages.length,
          included_characters: includedCharacters,
          skipped_characters: skippedCharacters,
+          included_as_environment: includedAsEnvironment,
+          included_as_character_match: includedAsCharacterMatch,
        }),
        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
      );

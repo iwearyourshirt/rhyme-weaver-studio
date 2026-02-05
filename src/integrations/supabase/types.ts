@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       characters: {
         Row: {
+          character_type: string
           created_at: string
           description: string
           id: string
@@ -25,6 +26,7 @@ export type Database = {
           reference_images: Json | null
         }
         Insert: {
+          character_type?: string
           created_at?: string
           description: string
           id?: string
@@ -34,6 +36,7 @@ export type Database = {
           reference_images?: Json | null
         }
         Update: {
+          character_type?: string
           created_at?: string
           description?: string
           id?: string

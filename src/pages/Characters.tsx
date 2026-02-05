@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, ArrowRight, Star, Trash2, Wand2, Loader2, RefreshCw, ZoomIn, RotateCcw, X, Pencil } from 'lucide-react';
+ import { Plus, ArrowRight, Star, Trash2, Wand2, Loader2, RefreshCw, ZoomIn, RotateCcw, X, Pencil, Mountain, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+ import { Badge } from '@/components/ui/badge';
+ import {
+   Select,
+   SelectContent,
+   SelectItem,
+   SelectTrigger,
+   SelectValue,
+ } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -391,7 +399,25 @@ export default function Characters() {
           {characters?.map((character) => (
             <Card key={character.id} className="card-shadow group">
               <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                <CardTitle className="text-lg">{character.name}</CardTitle>
+                 <div className="flex flex-col gap-1">
+                   <CardTitle className="text-lg">{character.name}</CardTitle>
+                   <Badge 
+                     variant={character.character_type === 'environment' ? 'secondary' : 'outline'}
+                     className="w-fit text-xs gap-1"
+                   >
+                     {character.character_type === 'environment' ? (
+                       <>
+                         <Mountain className="h-3 w-3" />
+                         Environment
+                       </>
+                     ) : (
+                       <>
+                         <User className="h-3 w-3" />
+                         Character
+                       </>
+                     )}
+                   </Badge>
+                 </div>
                 <div className="flex gap-1 -mt-1 -mr-2">
                   <Button
                     variant="ghost"
@@ -441,6 +467,38 @@ export default function Characters() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
+                 <div className="flex items-center gap-2">
+                   <Label className="text-xs text-muted-foreground whitespace-nowrap">Type:</Label>
+                   <Select
+                     value={character.character_type || 'character'}
+                     onValueChange={(value: 'character' | 'environment') => {
+                       updateCharacter.mutate({
+                         id: character.id,
+                         projectId: projectId!,
+                         updates: { character_type: value },
+                       });
+                     }}
+                   >
+                     <SelectTrigger className="h-8 text-xs">
+                       <SelectValue />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="character">
+                         <div className="flex items-center gap-1.5">
+                           <User className="h-3 w-3" />
+                           Character
+                         </div>
+                       </SelectItem>
+                       <SelectItem value="environment">
+                         <div className="flex items-center gap-1.5">
+                           <Mountain className="h-3 w-3" />
+                           Environment
+                         </div>
+                       </SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+                 
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {character.description}
                 </p>
