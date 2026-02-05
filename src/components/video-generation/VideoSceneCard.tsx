@@ -143,11 +143,11 @@ export function VideoSceneCard({
   };
 
   return (
-    <Card className="border overflow-hidden group">
-      {/* Horizontal layout for smaller screens, vertical for larger */}
-      <div className="flex flex-row lg:flex-col">
-        {/* Video/Image section - 2/3 width on small screens, full width on large */}
-        <div className="w-2/3 lg:w-full aspect-video bg-muted relative flex-shrink-0">
+    <Card className="border overflow-hidden">
+      {/* Responsive layout */}
+      <div className="flex flex-col">
+        {/* Video/Image Area */}
+        <div className="aspect-video bg-muted relative">
           {scene.video_status === 'done' && scene.video_url ? (
             <>
               <video
@@ -158,18 +158,18 @@ export function VideoSceneCard({
                 loop={false}
                 playsInline
               />
-              <div
-                className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity"
+              <button
+                className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 hover:opacity-100 transition-opacity"
                 onClick={handlePlayPause}
               >
-                <div className="bg-primary rounded-full p-3">
+                <div className="bg-white rounded-full p-2.5">
                   {isPlaying ? (
-                    <Pause className="h-6 w-6 text-primary-foreground fill-current" />
+                    <Pause className="h-5 w-5 text-foreground fill-current" />
                   ) : (
-                    <Play className="h-6 w-6 text-primary-foreground fill-current" />
+                    <Play className="h-5 w-5 text-foreground fill-current" />
                   )}
                 </div>
-              </div>
+              </button>
             </>
           ) : scene.image_url ? (
             <img
@@ -179,31 +179,30 @@ export function VideoSceneCard({
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <Video className="h-12 w-12 text-muted-foreground/30" />
+              <Video className="h-8 w-8 text-muted-foreground/20" />
             </div>
           )}
 
           {/* Generating overlay */}
           {isActuallyGenerating && (
-            <div className="absolute inset-0 bg-background/95 flex flex-col items-center justify-center p-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-2 border-foreground border-t-transparent mb-3" />
-              <p className="text-xs font-medium text-foreground mb-2">
-                {isCancelling ? 'Cancelling...' : 'Generating video...'}
+            <div className="absolute inset-0 bg-background/95 flex flex-col items-center justify-center gap-2 p-4">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-foreground border-t-transparent" />
+              <p className="text-xs font-medium">{isCancelling ? 'Cancelling...' : 'Generating...'}</p>
+              <div className="w-24">
+                <Progress value={progressPercent} className="h-1" />
+              </div>
+              <p className="text-[10px] text-muted-foreground font-mono">
+                {elapsedTime}s • {getTimeDisplay()}
               </p>
-              <Progress value={progressPercent} className="w-full max-w-[140px] h-1.5 mb-2" />
-              <p className="text-xs text-muted-foreground mb-3 text-center font-mono">
-                <span className="font-medium">{elapsedTime}s</span> • {getTimeDisplay()}
-              </p>
-              {/* Cancel button */}
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onCancel}
                 disabled={isCancelling}
-                className="gap-1.5 text-xs h-7 bg-background/80"
+                className="h-7 text-xs mt-1"
               >
-                <X className="h-3 w-3" />
-                {isCancelling ? 'Cancelling...' : 'Cancel'}
+                <X className="h-3 w-3 mr-1" />
+                Cancel
               </Button>
             </div>
           )}
@@ -212,69 +211,64 @@ export function VideoSceneCard({
           {scene.video_status === 'failed' && (
             <div className="absolute inset-0 bg-destructive/10 flex items-center justify-center">
               <div className="text-center p-4">
-                <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
-                <p className="text-xs text-destructive">{scene.video_error || 'Generation failed'}</p>
+                <AlertCircle className="h-6 w-6 text-destructive mx-auto mb-1" />
+                <p className="text-[10px] text-destructive">{scene.video_error || 'Generation failed'}</p>
               </div>
             </div>
           )}
 
-          {/* No image yet overlay */}
+          {/* No image overlay */}
           {!canGenerate && scene.video_status === 'pending' && (
             <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
-              <p className="text-xs text-muted-foreground text-center px-4">
-                Generate scene image first
-              </p>
+              <p className="text-xs text-muted-foreground">Generate scene image first</p>
             </div>
           )}
         </div>
 
-        {/* Content section - 1/3 width on small screens, full width on large */}
-        <CardContent className="p-3 space-y-3 w-1/3 lg:w-full flex flex-col justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Scene {scene.scene_number}</span>
-              <StatusBadge status={scene.video_status} />
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              {formatTime(scene.start_time)} - {formatTime(scene.end_time)}
-            </p>
-
-            <p className="text-xs text-muted-foreground line-clamp-2 italic">
-              "{scene.lyric_snippet}"
-            </p>
-
-            {/* Shot Type Selector */}
-            <Select
-              value={scene.shot_type}
-              onValueChange={(value: ShotType) => onUpdateShotType(value)}
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="Shot type" />
-              </SelectTrigger>
-              <SelectContent>
-                {SHOT_TYPE_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Content Area - consistent 16px padding, 12px gaps */}
+        <CardContent className="p-4 space-y-3">
+          {/* Row 1: Scene number + Status */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Scene {scene.scene_number}</span>
+            <StatusBadge status={scene.video_status} />
           </div>
 
-          {/* Animation Prompt Editor */}
+          {/* Row 2: Time range */}
+          <p className="text-xs text-muted-foreground font-mono">
+            {formatTime(scene.start_time)} – {formatTime(scene.end_time)}
+          </p>
+
+          {/* Row 3: Lyric snippet */}
+          <p className="text-xs text-muted-foreground italic line-clamp-2 leading-relaxed">
+            "{scene.lyric_snippet}"
+          </p>
+
+          {/* Row 4: Shot Type Selector */}
+          <Select
+            value={scene.shot_type}
+            onValueChange={(value: ShotType) => onUpdateShotType(value)}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Shot type" />
+            </SelectTrigger>
+            <SelectContent>
+              {SHOT_TYPE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Row 5: Animation Prompt Editor */}
           <Collapsible open={isPromptOpen} onOpenChange={setIsPromptOpen}>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="w-full justify-between px-2 h-8">
-                <span className="text-xs">Animation Prompt</span>
-                {isPromptOpen ? (
-                  <ChevronUp className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                )}
+              <Button variant="ghost" size="sm" className="w-full justify-between px-0 h-8 hover:bg-transparent">
+                <span className="text-xs font-medium">Animation Prompt</span>
+                {isPromptOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 pt-2">
+            <CollapsibleContent className="space-y-3 pt-2">
               <Textarea
                 value={editedPrompt}
                 onChange={(e) => setEditedPrompt(e.target.value)}
@@ -291,27 +285,26 @@ export function VideoSceneCard({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Generate Button */}
+          {/* Row 6: Generate Button */}
           <Button
-            size="sm"
             variant={scene.video_status === 'done' ? 'outline' : 'default'}
-            className="w-full gap-1.5"
+            className="w-full h-9"
             onClick={onGenerate}
             disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating'}
           >
             {scene.video_status === 'done' ? (
               <>
-                <RefreshCw className="h-3.5 w-3.5" />
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                 Regenerate
               </>
             ) : scene.video_status === 'failed' ? (
               <>
-                <RefreshCw className="h-3.5 w-3.5" />
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                 Retry
               </>
             ) : (
               <>
-                <Wand2 className="h-3.5 w-3.5" />
+                <Wand2 className="h-3.5 w-3.5 mr-1.5" />
                 Generate
               </>
             )}

@@ -94,7 +94,8 @@ export function SceneCard({
   const progressPercent = Math.min((elapsedTime / ESTIMATED_GENERATION_TIME) * 100, 95);
 
   return (
-    <Card className="border overflow-hidden group">
+    <Card className="border overflow-hidden">
+      {/* Image Area */}
       <div className="aspect-[3/2] bg-muted relative">
         {scene.image_url ? (
           <img
@@ -104,13 +105,15 @@ export function SceneCard({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <ImageIcon className="h-10 w-10 text-muted-foreground/20" />
+            <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
           </div>
         )}
+        
+        {/* Generating overlay */}
         {isGenerating && (
-          <div className="absolute inset-0 bg-background/95 flex flex-col items-center justify-center gap-3 p-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-2 border-foreground border-t-transparent" />
-            <div className="w-full max-w-[160px]">
+          <div className="absolute inset-0 bg-background/95 flex flex-col items-center justify-center gap-2 p-4">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-foreground border-t-transparent" />
+            <div className="w-24">
               <div className="h-1 bg-muted rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-foreground transition-all duration-1000 ease-linear"
@@ -118,72 +121,69 @@ export function SceneCard({
                 />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground text-center font-mono">
+            <p className="text-[10px] text-muted-foreground font-mono">
               {elapsedTime}s / ~{ESTIMATED_GENERATION_TIME}s
             </p>
           </div>
         )}
         
-        {/* Approval checkbox overlay */}
-        <div className="absolute top-2 right-2">
-          <div 
-            className={`flex items-center justify-center w-7 h-7 rounded cursor-pointer transition-colors ${
-              scene.image_approved 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-background/90 hover:bg-background text-muted-foreground border border-border'
-            }`}
-            onClick={() => onApprovalChange(!scene.image_approved)}
-            title={scene.image_approved ? 'Approved - click to unapprove' : 'Click to approve'}
-          >
-            <Check className="h-4 w-4" />
-          </div>
-        </div>
+        {/* Approval checkbox */}
+        <button 
+          className={`absolute top-2 right-2 flex items-center justify-center w-6 h-6 rounded transition-colors ${
+            scene.image_approved 
+              ? 'bg-primary text-primary-foreground' 
+              : 'bg-white/90 text-muted-foreground border border-border hover:bg-white'
+          }`}
+          onClick={() => onApprovalChange(!scene.image_approved)}
+        >
+          <Check className="h-3.5 w-3.5" />
+        </button>
       </div>
       
+      {/* Content Area - consistent 16px padding, 12px gaps */}
       <CardContent className="p-4 space-y-3">
+        {/* Row 1: Scene number + Status */}
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">Scene {scene.scene_number}</span>
           <StatusBadge status={scene.image_status} />
         </div>
         
+        {/* Row 2: Time range */}
         <p className="text-xs text-muted-foreground font-mono">
-          {formatTime(scene.start_time)} - {formatTime(scene.end_time)}
+          {formatTime(scene.start_time)} – {formatTime(scene.end_time)}
         </p>
         
-        <p className="text-xs text-muted-foreground line-clamp-2 italic">
+        {/* Row 3: Lyric snippet */}
+        <p className="text-xs text-muted-foreground italic line-clamp-2 leading-relaxed">
           "{scene.lyric_snippet}"
         </p>
 
-        {/* Shot Type Selector */}
+        {/* Row 4: Shot Type Selector */}
         <Select
           value={scene.shot_type}
           onValueChange={(value: ShotType) => onPromptSave({ shot_type: value })}
         >
-          <SelectTrigger className="h-8 text-xs">
+          <SelectTrigger className="h-9">
             <SelectValue placeholder="Shot type" />
           </SelectTrigger>
           <SelectContent>
             {SHOT_TYPE_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value} className="text-xs">
+              <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        {/* Collapsible prompt editor */}
+        {/* Row 5: Collapsible prompt editor */}
         <Collapsible open={promptExpanded} onOpenChange={setPromptExpanded}>
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-full justify-between px-2 h-8">
-              <span className="text-xs">Image Prompt</span>
-              {promptExpanded ? (
-                <ChevronUp className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5" />
-              )}
+            <Button variant="ghost" size="sm" className="w-full justify-between px-0 h-8 hover:bg-transparent">
+              <span className="text-xs font-medium">Image Prompt</span>
+              {promptExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             </Button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-2 pt-2">
+          <CollapsibleContent className="space-y-3 pt-2">
             <Textarea
               value={editedPrompt}
               onChange={(e) => setEditedPrompt(e.target.value)}
@@ -199,36 +199,32 @@ export function SceneCard({
             {hasUnsavedChanges && (
               <Button
                 size="sm"
-                className="w-full gap-1.5"
+                className="w-full h-9"
                 onClick={handleSave}
                 disabled={isSaving}
               >
-                {isSaving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Save className="h-3.5 w-3.5" />
-                )}
+                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
                 Save Prompt
               </Button>
             )}
           </CollapsibleContent>
         </Collapsible>
 
+        {/* Row 6: Generate Button */}
         <Button
-          size="sm"
           variant={scene.image_url ? 'outline' : 'default'}
-          className="w-full gap-1.5"
+          className="w-full h-9"
           onClick={onGenerate}
           disabled={isGenerating || generatingAll || scene.image_status === 'generating'}
         >
           {scene.image_url ? (
             <>
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
               Regenerate
             </>
           ) : (
             <>
-              <Wand2 className="h-3.5 w-3.5" />
+              <Wand2 className="h-3.5 w-3.5 mr-1.5" />
               Generate
             </>
           )}

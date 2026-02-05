@@ -394,236 +394,231 @@ export default function Characters() {
           </CardContent>
         </Card>
       ) : (
-         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {characters?.map((character) => (
-            <Card key={character.id} className="border group">
-               <CardHeader className="flex flex-row items-start justify-between space-y-0 p-4 pb-3">
-                 <div className="flex flex-col gap-1.5">
-                    <CardTitle className="text-sm font-medium">{character.name}</CardTitle>
-                   <Badge 
-                     variant={character.character_type === 'environment' ? 'secondary' : 'outline'}
-                     className="w-fit text-xs gap-1"
-                   >
-                     {character.character_type === 'environment' ? (
-                       <>
-                         <Mountain className="h-3 w-3" />
-                         Environment
-                       </>
-                     ) : (
-                       <>
-                         <User className="h-3 w-3" />
-                         Character
-                       </>
-                     )}
-                   </Badge>
-                 </div>
-                 <div className="flex gap-0.5 -mt-1 -mr-1">
+            <Card key={character.id} className="border group flex flex-col">
+              {/* Card Header - fixed height, aligned */}
+              <CardHeader className="p-4 pb-0 flex flex-row items-start justify-between space-y-0">
+                <div className="space-y-1">
+                  <CardTitle className="text-sm font-medium leading-tight">{character.name}</CardTitle>
+                  <Badge 
+                    variant={character.character_type === 'environment' ? 'secondary' : 'outline'}
+                    className="text-[10px] gap-1 h-5"
+                  >
+                    {character.character_type === 'environment' ? (
+                      <>
+                        <Mountain className="h-2.5 w-2.5" />
+                        Environment
+                      </>
+                    ) : (
+                      <>
+                        <User className="h-2.5 w-2.5" />
+                        Character
+                      </>
+                    )}
+                  </Badge>
+                </div>
+                <div className="flex gap-0.5">
                   <Button
                     variant="ghost"
-                     size="sm"
-                     className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => setEditingCharacter({
                       id: character.id,
                       name: character.name,
                       description: character.description,
                     })}
                   >
-                     <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                   </Button>
                   <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                       size="sm"
-                       className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Character?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently delete "{character.name}".
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() =>
-                          deleteCharacter.mutate({
-                            id: character.id,
-                            projectId: projectId!,
-                          })
-                        }
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Character?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently delete "{character.name}".
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() =>
+                            deleteCharacter.mutate({
+                              id: character.id,
+                              projectId: projectId!,
+                            })
+                          }
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardHeader>
-               <CardContent className="space-y-2 p-3 pt-0">
-                 <div className="flex items-center gap-2">
-                   <Label className="text-xs text-muted-foreground whitespace-nowrap">Type:</Label>
-                   <Select
-                     value={character.character_type || 'character'}
-                     onValueChange={(value: 'character' | 'environment') => {
-                       updateCharacter.mutate({
-                         id: character.id,
-                         projectId: projectId!,
-                         updates: { character_type: value },
-                       });
-                     }}
-                   >
-                     <SelectTrigger className="h-8 text-xs">
-                       <SelectValue />
-                     </SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="character">
-                         <div className="flex items-center gap-1.5">
-                           <User className="h-3 w-3" />
-                           Character
-                         </div>
-                       </SelectItem>
-                       <SelectItem value="environment">
-                         <div className="flex items-center gap-1.5">
-                           <Mountain className="h-3 w-3" />
-                           Environment
-                         </div>
-                       </SelectItem>
-                     </SelectContent>
-                   </Select>
-                 </div>
-                 
-                 <p className="text-xs text-muted-foreground line-clamp-2">
+
+              {/* Card Content - consistent spacing */}
+              <CardContent className="p-4 pt-3 flex-1 flex flex-col gap-3">
+                {/* Type Selector */}
+                <Select
+                  value={character.character_type || 'character'}
+                  onValueChange={(value: 'character' | 'environment') => {
+                    updateCharacter.mutate({
+                      id: character.id,
+                      projectId: projectId!,
+                      updates: { character_type: value },
+                    });
+                  }}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="character">
+                      <div className="flex items-center gap-2">
+                        <User className="h-3.5 w-3.5" />
+                        <span>Character</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="environment">
+                      <div className="flex items-center gap-2">
+                        <Mountain className="h-3.5 w-3.5" />
+                        <span>Environment</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Description */}
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                   {character.description}
                 </p>
 
-                {character.reference_images.length > 0 ? (
-                   <div className="space-y-2">
-                     <div className="grid grid-cols-3 gap-1.5">
-                      {character.reference_images.map((img, idx) => (
-                        <div
-                          key={idx}
-                          className={cn(
-                             'relative aspect-square rounded-md overflow-hidden border-2 transition-colors group/image cursor-pointer',
-                            character.primary_image_url === img
-                              ? 'border-primary'
-                              : 'border-transparent hover:border-muted-foreground/50'
-                          )}
-                           onClick={() => handleSetPrimary(character.id, img)}
-                        >
-                          <img
-                            src={img}
-                            alt={`${character.name} reference ${idx + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                          {character.primary_image_url === img && (
-                            <div className="absolute top-1 right-1 bg-primary rounded-full p-0.5">
-                              <Star className="h-3 w-3 text-primary-foreground fill-current" />
+                {/* Reference Images or Generate Button */}
+                <div className="mt-auto space-y-3">
+                  {character.reference_images.length > 0 ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {character.reference_images.map((img, idx) => (
+                          <div
+                            key={idx}
+                            className={cn(
+                              'relative aspect-square rounded overflow-hidden border-2 transition-colors group/image cursor-pointer',
+                              character.primary_image_url === img
+                                ? 'border-foreground'
+                                : 'border-transparent hover:border-muted-foreground/50'
+                            )}
+                            onClick={() => handleSetPrimary(character.id, img)}
+                          >
+                            <img
+                              src={img}
+                              alt={`${character.name} reference ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            {character.primary_image_url === img && (
+                              <div className="absolute top-0.5 right-0.5 bg-foreground rounded-full p-0.5">
+                                <Star className="h-2.5 w-2.5 text-background fill-current" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/image:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
+                              {character.primary_image_url !== img && (
+                                <Button
+                                  size="sm"
+                                  className="h-5 text-[10px] px-1.5 gap-0.5 w-full"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSetPrimary(character.id, img);
+                                  }}
+                                >
+                                  <Star className="h-2.5 w-2.5" />
+                                  Primary
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-5 text-[10px] px-1.5 gap-0.5 w-full"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openImagePreview(img, character.id, character.name, character.primary_image_url === img);
+                                }}
+                              >
+                                <ZoomIn className="h-2.5 w-2.5" />
+                                View
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="h-5 text-[10px] px-1.5 gap-0.5 w-full"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingImage({ characterId: character.id, imageUrl: img });
+                                }}
+                              >
+                                <Trash2 className="h-2.5 w-2.5" />
+                              </Button>
                             </div>
-                          )}
-                          {/* Hover overlay with zoom button */}
-                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/image:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 p-1">
-                             {character.primary_image_url !== img && (
-                               <Button
-                                 size="sm"
-                                 variant="default"
-                                 className="h-6 text-xs px-2 gap-1 w-full"
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   handleSetPrimary(character.id, img);
-                                 }}
-                               >
-                                 <Star className="h-3 w-3" />
-                                 Primary
-                               </Button>
-                             )}
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                               className="h-6 text-xs px-2 gap-1 w-full"
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 openImagePreview(
-                                img,
-                                character.id,
-                                character.name,
-                                character.primary_image_url === img
-                               );
-                               }}
-                            >
-                              <ZoomIn className="h-3 w-3" />
-                              View
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                               className="h-6 text-xs px-2 gap-1 w-full"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeletingImage({ characterId: character.id, imageUrl: img });
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                             </Button>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                     <div className="flex flex-col sm:flex-row gap-1.5">
-                      {character.primary_image_url && (
-                        <Button
-                          variant="default"
-                          size="sm"
-                           className="flex-1 gap-1.5 text-xs h-8"
-                          onClick={() => handleGenerateConsistentAngles(character.id)}
-                          disabled={generatingAnglesCharId === character.id}
-                        >
-                          {generatingAnglesCharId === character.id ? (
-                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                             <RotateCcw className="h-3.5 w-3.5" />
-                          )}
-                           <span className="hidden sm:inline">{generatingAnglesCharId === character.id ? 'Generating...' : 'Generate Angles'}</span>
-                           <span className="sm:hidden">{generatingAnglesCharId === character.id ? '...' : 'Angles'}</span>
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                         className="flex-1 gap-1.5 text-xs h-8"
-                        onClick={() => handleGenerateImages(character.id)}
-                        disabled={generatingCharId === character.id}
-                      >
-                        {generatingCharId === character.id ? (
-                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                           <RefreshCw className="h-3.5 w-3.5" />
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        {character.primary_image_url && (
+                          <Button
+                            size="sm"
+                            className="flex-1 h-9"
+                            onClick={() => handleGenerateConsistentAngles(character.id)}
+                            disabled={generatingAnglesCharId === character.id}
+                          >
+                            {generatingAnglesCharId === character.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            )}
+                            <span className="ml-1.5">{generatingAnglesCharId === character.id ? 'Generating...' : 'Angles'}</span>
+                          </Button>
                         )}
-                         <span className="hidden sm:inline">{generatingCharId === character.id ? 'Regenerating...' : 'New Set'}</span>
-                         <span className="sm:hidden">{generatingCharId === character.id ? '...' : 'New'}</span>
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Button
-                    variant="outline"
-                     className="w-full gap-2 text-sm"
-                    onClick={() => handleGenerateImages(character.id)}
-                    disabled={generatingCharId === character.id}
-                  >
-                    {generatingCharId === character.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Wand2 className="h-4 w-4" />
-                    )}
-                    {generatingCharId === character.id ? 'Generating (30-60s)...' : 'Generate Reference Images'}
-                  </Button>
-                )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-9"
+                          onClick={() => handleGenerateImages(character.id)}
+                          disabled={generatingCharId === character.id}
+                        >
+                          {generatingCharId === character.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          )}
+                          <span className="ml-1.5">{generatingCharId === character.id ? 'Generating...' : 'New Set'}</span>
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full h-9"
+                      onClick={() => handleGenerateImages(character.id)}
+                      disabled={generatingCharId === character.id}
+                    >
+                      {generatingCharId === character.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Wand2 className="h-4 w-4" />
+                      )}
+                      <span className="ml-2">{generatingCharId === character.id ? 'Generating...' : 'Generate Reference Images'}</span>
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
