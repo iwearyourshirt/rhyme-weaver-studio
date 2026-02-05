@@ -2,7 +2,7 @@
  
  const corsHeaders = {
    "Access-Control-Allow-Origin": "*",
-   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
  };
  
  interface WhisperChunk {
@@ -23,15 +23,26 @@
  
  serve(async (req) => {
    if (req.method === "OPTIONS") {
-     return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
    }
  
    try {
      const FAL_API_KEY = Deno.env.get("FAL_API_KEY");
      if (!FAL_API_KEY) {
-       throw new Error("FAL_API_KEY is not configured");
+      console.error("FAL_API_KEY is not set in environment variables");
+      return new Response(
+        JSON.stringify({ error: "FAL_API_KEY is not configured. Please add your fal.ai API key in project secrets." }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
      }
  
+    // Sanitize the API key - remove any whitespace or newlines
+    const cleanApiKey = FAL_API_KEY.trim();
+    console.log("FAL_API_KEY length:", cleanApiKey.length);
+
      const { audio_url } = await req.json();
      
      if (!audio_url) {
@@ -40,12 +51,14 @@
  
      console.log("Calling fal.ai Whisper API with audio_url:", audio_url);
  
+    const requestHeaders = new Headers({
+      "Content-Type": "application/json",
+      "Authorization": `Key ${cleanApiKey}`,
+    });
+
      const response = await fetch("https://fal.run/fal-ai/whisper", {
        method: "POST",
-       headers: {
-         "Authorization": `Key ${FAL_API_KEY}`,
-         "Content-Type": "application/json",
-       },
+      headers: requestHeaders,
        body: JSON.stringify({
          audio_url,
          task: "transcribe",
