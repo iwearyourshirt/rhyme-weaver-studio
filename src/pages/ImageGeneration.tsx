@@ -27,6 +27,7 @@ export default function ImageGeneration() {
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [generatingAll, setGeneratingAll] = useState(false);
   const toastShownRef = useRef<Set<string>>(new Set());
+  const cancelAllRef = useRef(false);
 
   useEffect(() => {
     setCurrentPage('Image Generation');
@@ -106,18 +107,29 @@ export default function ImageGeneration() {
   const handleGenerateAll = async () => {
     if (!scenes) return;
     
+    cancelAllRef.current = false;
     setGeneratingAll(true);
 
     const pendingScenes = scenes.filter(
       (s) => s.image_status !== 'done' && s.image_status !== 'generating'
     );
 
-    // Generate sequentially
+    // Generate sequentially with cancellation check
     for (const scene of pendingScenes) {
+      if (cancelAllRef.current) {
+        toast.info('Batch generation cancelled');
+        break;
+      }
       await generateImage(scene.id);
     }
 
     setGeneratingAll(false);
+    cancelAllRef.current = false;
+  };
+
+  const handleCancelAll = () => {
+    cancelAllRef.current = true;
+    toast.info('Cancelling after current image completes...');
   };
 
   const handleApprovalChange = async (sceneId: string, approved: boolean) => {
@@ -183,14 +195,24 @@ export default function ImageGeneration() {
             {approvedCount} / {totalCount} approved
           </div>
           <Progress value={(approvedCount / totalCount) * 100} className="w-32" />
-          <Button
-            onClick={handleGenerateAll}
-            disabled={generatingIds.size > 0 || generatingAll}
-            className="gap-2"
-          >
-            <Wand2 className="h-4 w-4" />
-            Generate All
-          </Button>
+          {generatingAll ? (
+            <Button
+              onClick={handleCancelAll}
+              variant="destructive"
+              className="gap-2"
+            >
+              Cancel All
+            </Button>
+          ) : (
+            <Button
+              onClick={handleGenerateAll}
+              disabled={generatingIds.size > 0}
+              className="gap-2"
+            >
+              <Wand2 className="h-4 w-4" />
+              Generate All
+            </Button>
+          )}
         </div>
       </div>
 
