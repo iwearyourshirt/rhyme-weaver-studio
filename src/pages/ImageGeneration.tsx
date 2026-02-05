@@ -21,8 +21,8 @@ export default function ImageGeneration() {
   const updateProject = useUpdateProject();
   const { setCurrentPage, setProjectData, logApiCall } = useDebug();
 
-  // Enable realtime updates for scenes
-  useScenesRealtime(projectId);
+  // Enable realtime updates and get refetch function
+  const { refetchScenes } = useScenesRealtime(projectId);
 
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [generatingAll, setGeneratingAll] = useState(false);
