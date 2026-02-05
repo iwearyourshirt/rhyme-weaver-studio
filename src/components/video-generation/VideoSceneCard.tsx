@@ -201,20 +201,24 @@ export function VideoSceneCard({
               <StatusBadge status={scene.video_status} />
             </div>
 
-            <p className="text-xs text-muted-foreground line-clamp-1">
+            <p className="text-xs text-muted-foreground">
               {formatTime(scene.start_time)} - {formatTime(scene.end_time)}
+            </p>
+
+            <p className="text-xs text-muted-foreground line-clamp-2 italic">
+              "{scene.lyric_snippet}"
             </p>
           </div>
 
           {/* Animation Prompt Editor */}
-          <Collapsible open={isPromptOpen} onOpenChange={setIsPromptOpen} className="hidden lg:block">
+          <Collapsible open={isPromptOpen} onOpenChange={setIsPromptOpen}>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="w-full justify-between text-xs h-7 px-2">
-                <span className="truncate">{editedPrompt.substring(0, 40)}...</span>
+              <Button variant="ghost" size="sm" className="w-full justify-between px-2 h-8">
+                <span className="text-xs">Animation Prompt</span>
                 {isPromptOpen ? (
-                  <ChevronUp className="h-3 w-3 ml-1 flex-shrink-0" />
+                  <ChevronUp className="h-3.5 w-3.5" />
                 ) : (
-                  <ChevronDown className="h-3 w-3 ml-1 flex-shrink-0" />
+                  <ChevronDown className="h-3.5 w-3.5" />
                 )}
               </Button>
             </CollapsibleTrigger>
