@@ -1,11 +1,12 @@
- import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  
  const corsHeaders = {
    "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
  };
  
-const FELTED_STYLE_PREFIX = `Needle-felted wool doll photographed with macro lens. Tiny handmade wool figure with rough matte felted texture showing individual poked wool fibers. Expressive face with wool fiber eyebrows, dark glossy eyes set close together, a small rounded wool nose, and a warm wide smile. The face has character and personality like a felt version of a real person, not a blank simple doll. Chunky stubby proportions like a toddler toy. Hair made of thick clumps of wool fiber. Clean simple soft-focus green or neutral background with no props or objects. Natural daylight, shallow depth of field.`;
+const FELTED_STYLE_PREFIX = `Needle-felted wool character, looks like a real handmade miniature wool figure photographed with a macro lens. Matte felted texture with visible wool fibers. Expressive face with wool fiber eyebrows, dark glossy eyes, a small rounded nose, and a warm smile with personality. Chunky proportions. Hair made of thick wool fiber clumps. Clean soft-focus background. Natural daylight, shallow depth of field.`;
  
  const POSE_SUFFIXES = [
   "Front view of the felted doll, full body visible, standing on felted wool grass.",
@@ -14,8 +15,8 @@ const FELTED_STYLE_PREFIX = `Needle-felted wool doll photographed with macro len
   "Extreme close-up macro shot of the felted doll's face, showing wool fiber texture detail, black bead eyes, shallow depth of field.",
  ];
  
- interface FluxResponse {
-   images: Array<{ url: string }>;
+interface OpenAIImageResponse {
+  data: Array<{ b64_json: string }>;
  }
  
  serve(async (req) => {
@@ -24,11 +25,11 @@ const FELTED_STYLE_PREFIX = `Needle-felted wool doll photographed with macro len
    }
  
    try {
-     const FAL_API_KEY = Deno.env.get("FAL_API_KEY");
-     if (!FAL_API_KEY) {
-      console.error("FAL_API_KEY is not set in environment variables");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      console.error("OPENAI_API_KEY is not set in environment variables");
       return new Response(
-        JSON.stringify({ error: "FAL_API_KEY is not configured. Please add your fal.ai API key in project secrets." }),
+        JSON.stringify({ error: "OPENAI_API_KEY is not configured. Please add your OpenAI API key in project secrets." }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -36,19 +37,35 @@ const FELTED_STYLE_PREFIX = `Needle-felted wool doll photographed with macro len
       );
      }
  
-    // Sanitize the API key - remove any whitespace or newlines
-    const cleanApiKey = FAL_API_KEY.trim();
-    console.log("FAL_API_KEY length:", cleanApiKey.length);
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("Supabase credentials not configured");
+      return new Response(
+        JSON.stringify({ error: "Supabase credentials not configured" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
-     const { character_name, character_description } = await req.json();
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    const { character_name, character_description, project_id, character_id } = await req.json();
      
      if (!character_name || !character_description) {
        throw new Error("character_name and character_description are required");
      }
+
+    if (!project_id || !character_id) {
+      throw new Error("project_id and character_id are required for storage");
+    }
  
      console.log("Generating images for character:", character_name);
  
-    const basePrompt = `${FELTED_STYLE_PREFIX}\n\nThis felted doll depicts ${character_name}, ${character_description}`;
+    const basePrompt = `${FELTED_STYLE_PREFIX}\n\nThis character is ${character_name}, ${character_description}`;
  
      // Generate all 4 images in parallel
     const generatedPrompts: string[] = [];
@@ -60,32 +77,62 @@ const FELTED_STYLE_PREFIX = `Needle-felted wool doll photographed with macro len
       console.log(`Full prompt: ${fullPrompt}`);
       generatedPrompts.push(fullPrompt);
        
-      const requestHeaders = new Headers({
-        "Content-Type": "application/json",
-        "Authorization": `Key ${cleanApiKey}`,
-      });
-      
-      const response = await fetch("https://fal.run/fal-ai/flux-pro/v1.1", {
+      const response = await fetch("https://api.openai.com/v1/images/generations", {
          method: "POST",
-        headers: requestHeaders,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        },
          body: JSON.stringify({
+          model: "gpt-image-1",
            prompt: fullPrompt,
-           image_size: "square",
-           num_images: 1,
-           enable_safety_checker: true,
+          size: "1024x1024",
+          quality: "high",
+          n: 1,
+          response_format: "b64_json",
          }),
        });
  
        if (!response.ok) {
          const errorText = await response.text();
-         console.error(`Flux API error for image ${index + 1}:`, response.status, errorText);
-         throw new Error(`Flux API error: ${response.status} - ${errorText}`);
+          console.error(`OpenAI API error for image ${index + 1}:`, response.status, errorText);
+          throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
        }
  
-       const data: FluxResponse = await response.json();
+       const data: OpenAIImageResponse = await response.json();
        console.log(`Image ${index + 1}/4 generated successfully`);
        
-       return data.images[0]?.url;
+       const b64Data = data.data[0]?.b64_json;
+       if (!b64Data) {
+         throw new Error(`No image data returned for image ${index + 1}`);
+       }
+
+       // Convert base64 to binary
+       const binaryData = Uint8Array.from(atob(b64Data), c => c.charCodeAt(0));
+       
+       // Upload to Supabase storage
+       const filePath = `${project_id}/${character_id}/${index + 1}.png`;
+       console.log(`Uploading image ${index + 1} to storage: ${filePath}`);
+       
+       const { error: uploadError } = await supabase.storage
+         .from("character-images")
+         .upload(filePath, binaryData, {
+           contentType: "image/png",
+           upsert: true,
+         });
+
+       if (uploadError) {
+         console.error(`Storage upload error for image ${index + 1}:`, uploadError);
+         throw new Error(`Storage upload error: ${uploadError.message}`);
+       }
+
+       // Get public URL
+       const { data: publicUrlData } = supabase.storage
+         .from("character-images")
+         .getPublicUrl(filePath);
+
+       console.log(`Image ${index + 1} uploaded, URL: ${publicUrlData.publicUrl}`);
+       return publicUrlData.publicUrl;
      });
  
      const imageUrls = await Promise.all(imagePromises);
