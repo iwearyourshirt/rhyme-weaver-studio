@@ -92,6 +92,7 @@ export type Database = {
           created_at: string
           end_time: number
           id: string
+          image_approved: boolean
           image_prompt: string
           image_status: string
           image_url: string | null
@@ -109,6 +110,7 @@ export type Database = {
           created_at?: string
           end_time: number
           id?: string
+          image_approved?: boolean
           image_prompt: string
           image_status?: string
           image_url?: string | null
@@ -126,6 +128,7 @@ export type Database = {
           created_at?: string
           end_time?: number
           id?: string
+          image_approved?: boolean
           image_prompt?: string
           image_status?: string
           image_url?: string | null
