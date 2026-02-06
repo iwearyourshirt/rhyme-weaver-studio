@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
  
    try {
-     const { prompt_type, current_prompt, scene_description, shot_type, feedback } = await req.json();
+     const { prompt_type, current_prompt, scene_description, shot_type, sibling_prompt, feedback } = await req.json();
  
       if (!prompt_type || !feedback) {
         return new Response(
@@ -61,6 +61,10 @@ GUIDELINES:
       const userMessage = hasCurrentPrompt
         ? `Prompt Type: ${prompt_type === 'image' ? 'Image Generation' : 'Animation/Video'}
 ${shotLabel ? `Selected Shot Type: ${shotLabel}` : ''}
+
+Scene Description:
+${scene_description || '(none provided)'}
+${sibling_prompt ? `\n${prompt_type === 'image' ? 'Animation' : 'Image'} Prompt (for reference):\n${sibling_prompt}` : ''}
 
 Current Prompt:
 ${current_prompt}

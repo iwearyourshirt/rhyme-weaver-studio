@@ -649,13 +649,13 @@ export default function Storyboard() {
                           />
                           <PromptFeedback
                             currentPrompt={getEditedValue(scene, 'image_prompt')}
-                            sceneDescription={scene.scene_description}
+                            sceneDescription={getEditedValue(scene, 'scene_description')}
                             promptType="image"
                             shotType={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
+                            siblingPrompt={getEditedValue(scene, 'animation_prompt')}
                             onRewrite={(newPrompt) => {
                               handleLocalEdit(scene.id, 'image_prompt', newPrompt);
                               if (projectId) {
-                                // Extract character names from the new prompt and update characters_in_scene
                                 const charNames = (characters || [])
                                   .filter(c => c.character_type !== 'environment' && newPrompt.toLowerCase().includes(c.name.toLowerCase()))
                                   .map(c => c.name);
@@ -673,9 +673,10 @@ export default function Storyboard() {
                           />
                           <PromptFeedback
                             currentPrompt={getEditedValue(scene, 'animation_prompt')}
-                            sceneDescription={scene.scene_description}
+                            sceneDescription={getEditedValue(scene, 'scene_description')}
                             promptType="animation"
                             shotType={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
+                            siblingPrompt={getEditedValue(scene, 'image_prompt')}
                             onRewrite={(newPrompt) => {
                               handleLocalEdit(scene.id, 'animation_prompt', newPrompt);
                               if (projectId) {
