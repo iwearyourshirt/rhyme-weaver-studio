@@ -188,6 +188,54 @@ Deno.serve(async (req) => {
     
     console.log(`Generated ${validUrls.length} consistent angle images successfully`);
 
+    // Log cost: $0.04 per image x number of angles generated
+    const totalCost = validUrls.length * 0.04;
+    try {
+      const SUPABASE_URL_VAL = Deno.env.get("SUPABASE_URL")!;
+      const SUPABASE_KEY_VAL = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      await fetch(`${SUPABASE_URL_VAL}/rest/v1/cost_logs`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_KEY_VAL,
+          "Authorization": `Bearer ${SUPABASE_KEY_VAL}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({
+          project_id,
+          service: "openai-gpt-image-1",
+          operation: `Consistent angles for ${character_name} (${validUrls.length} images)`,
+          cost: totalCost,
+          tokens_input: null,
+          tokens_output: null,
+        }),
+      });
+
+      const projectResp = await fetch(`${SUPABASE_URL_VAL}/rest/v1/projects?id=eq.${project_id}&select=total_ai_cost`, {
+        headers: {
+          "apikey": SUPABASE_KEY_VAL,
+          "Authorization": `Bearer ${SUPABASE_KEY_VAL}`,
+        },
+      });
+      const projectData = await projectResp.json();
+      const currentTotal = Number(projectData?.[0]?.total_ai_cost || 0);
+
+      await fetch(`${SUPABASE_URL_VAL}/rest/v1/projects?id=eq.${project_id}`, {
+        method: "PATCH",
+        headers: {
+          "apikey": SUPABASE_KEY_VAL,
+          "Authorization": `Bearer ${SUPABASE_KEY_VAL}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({ total_ai_cost: currentTotal + totalCost }),
+      });
+
+      console.log(`Logged AI cost: openai-gpt-image-1 - $${totalCost.toFixed(4)}`);
+    } catch (costError) {
+      console.error("Failed to log AI cost:", costError);
+    }
+
     return new Response(
       JSON.stringify({
         images: validUrls,
