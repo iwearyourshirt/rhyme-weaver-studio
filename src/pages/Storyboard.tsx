@@ -613,7 +613,11 @@ export default function Storyboard() {
                             onRewrite={(newPrompt) => {
                               handleLocalEdit(scene.id, 'image_prompt', newPrompt);
                               if (projectId) {
-                                updateScene.mutateAsync({ id: scene.id, projectId, updates: { image_prompt: newPrompt } });
+                                // Extract character names from the new prompt and update characters_in_scene
+                                const charNames = (characters || [])
+                                  .filter(c => c.character_type !== 'environment' && newPrompt.toLowerCase().includes(c.name.toLowerCase()))
+                                  .map(c => c.name);
+                                updateScene.mutateAsync({ id: scene.id, projectId, updates: { image_prompt: newPrompt, characters_in_scene: charNames } });
                               }
                             }}
                           />
@@ -633,7 +637,10 @@ export default function Storyboard() {
                             onRewrite={(newPrompt) => {
                               handleLocalEdit(scene.id, 'animation_prompt', newPrompt);
                               if (projectId) {
-                                updateScene.mutateAsync({ id: scene.id, projectId, updates: { animation_prompt: newPrompt } });
+                                const charNames = (characters || [])
+                                  .filter(c => c.character_type !== 'environment' && newPrompt.toLowerCase().includes(c.name.toLowerCase()))
+                                  .map(c => c.name);
+                                updateScene.mutateAsync({ id: scene.id, projectId, updates: { animation_prompt: newPrompt, characters_in_scene: charNames } });
                               }
                             }}
                           />
