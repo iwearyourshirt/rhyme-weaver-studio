@@ -194,6 +194,7 @@ export function SceneCard({
               promptType="image"
               currentPrompt={editedPrompt}
               sceneDescription={scene.scene_description}
+              shotType={scene.shot_type}
               onRewrite={handlePromptRewritten}
             />
             {hasUnsavedChanges && (
