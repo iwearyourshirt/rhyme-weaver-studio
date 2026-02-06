@@ -6,7 +6,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
  };
  
- const DEFAULT_SYSTEM_MESSAGE = `You are a storyboard director for a stop-motion animated children's show. You create vivid, detailed scene descriptions that will be used to generate images and animate them into video clips.`;
+ const DEFAULT_SYSTEM_MESSAGE = `You are a storyboard director for a stop-motion animated children's show. You create vivid, detailed scene descriptions that will be used to generate images and animate them into video clips.
+
+When writing scene descriptions and prompts, ALWAYS refer to characters and environments by their exact names. Never use generic descriptions like "the spider" or "a garden" — use the character's name (e.g., "Webster") and the environment's name (e.g., "The Garden"). The image generation pipeline uses reference images keyed to these exact names, so using them is critical for visual consistency.
+
+Every scene MUST have a non-empty characters_in_scene array listing every character visible in that scene. The protagonist should appear in most scenes.`;
  
  interface TimestampEntry {
    start: number;
@@ -243,10 +247,27 @@ async function logAICost(
 - scene_description (2-3 sentences describing what is visually happening in this scene, what the characters are doing, the environment, camera angle, mood)
 - characters_in_scene (array of character names that appear in this scene)
 - shot_type (one of: "wide", "medium", "close-up", "extreme-close-up", "two-shot", "over-shoulder". Vary these throughout the storyboard to create visual interest. Use wide shots for establishing scenes and environments, close-ups for emotional moments and character focus, medium shots for dialogue and action, etc.)
-- image_prompt (a complete image generation prompt that combines the project's visual style with the scene description and character descriptions. Include the shot type framing in the prompt. This should be detailed enough to generate the image standalone without any other context.)
-- animation_prompt (a short description of how this scene should be animated: what moves, camera motion, character actions. Keep it to 1-2 sentences focused on the key motion.)
+- image_prompt (a concise image generation prompt. Reference all characters and environments BY THEIR EXACT NAMES — never generic descriptions like "a spider" or "a garden". The image system has reference images for each character/environment, so names alone ensure visual consistency. Focus on action, composition, shot framing, and mood. Include the shot type framing.)
+- animation_prompt (a short description of how this scene should be animated. Reference characters BY NAME — never generic descriptions. Describe what moves, camera motion, and character actions. Keep it to 1-2 sentences focused on the key motion.)
 
 Return the result as a JSON object with a single key "scenes" containing an array of scene objects.`;
+
+      // Append dynamic naming rules with actual character/environment names
+      const characterNames = characterEntries.map(c => c.name);
+      const environmentNames = environmentEntries.map(e => e.name);
+      
+      if (characterNames.length > 0 || environmentNames.length > 0) {
+        userMessage += `\n\nCRITICAL NAMING RULES:`;
+        if (characterNames.length > 0) {
+          userMessage += `\n- Character names to use: [${characterNames.join(', ')}]`;
+        }
+        if (environmentNames.length > 0) {
+          userMessage += `\n- Environment names to use: [${environmentNames.join(', ')}]`;
+        }
+        userMessage += `\n- ALWAYS use these exact names in scene_description, image_prompt, animation_prompt, and characters_in_scene.`;
+        userMessage += `\n- NEVER use generic descriptions like "the spider", "a girl", "a garden" — always use the character/environment name.`;
+        userMessage += `\n- characters_in_scene must list every character visible in that scene (NOT environments).`;
+      }
  
       console.log("Calling OpenAI API...");
       console.log("System message:", systemMessage);
