@@ -75,6 +75,19 @@ export default function ImageGeneration() {
     });
   }, [scenes, generatingIds]);
 
+  // Fallback polling: if any scenes are still in generatingIds, poll DB every 10s
+  // This catches cases where Realtime misses an update (e.g., channel errors)
+  useEffect(() => {
+    if (generatingIds.size === 0) return;
+
+    const interval = setInterval(() => {
+      console.log(`[Poll fallback] ${generatingIds.size} scenes still generating, refetching...`);
+      refetchScenes();
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [generatingIds.size, refetchScenes]);
+
   // Reset toast tracking when starting new generations
   const clearToastTracking = useCallback((sceneId: string) => {
     toastShownRef.current.delete(`${sceneId}:done`);
