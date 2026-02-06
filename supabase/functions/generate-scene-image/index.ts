@@ -187,15 +187,34 @@ function getShotTypeInstruction(shotType: string): string {
           // Determine which characters to include based on PROMPT TEXT only
            // characters_in_scene can be stale — the prompt is the source of truth for reference images
            const promptLowerForCharScan = scene.image_prompt.toLowerCase();
-           const referenceImages: DownloadedImage[] = [];
-           const includedCharacters: string[] = [];
-           
-           // Track whether any actual characters (non-environment) are included
-           let hasNonEnvironmentReference = false;
-           
-           for (const char of charList) {
-             const isEnvironment = char.character_type === "environment";
-             const isInPrompt = promptLowerForCharScan.includes(char.name.toLowerCase());
+            const referenceImages: DownloadedImage[] = [];
+            const includedCharacters: string[] = [];
+            
+            // Fuzzy name matching: check if any significant keyword from the character name
+            // appears in the prompt. This allows "cottage", "the cottage", "english cottage"
+            // to all match a character named "Cottage" or "The Cottage".
+            const STOP_WORDS = new Set(["the", "a", "an", "of", "in", "on", "at", "to", "and", "or", "is", "it"]);
+            
+            function nameMatchesPrompt(name: string, promptLower: string): boolean {
+              // First check exact full-name match (case-insensitive)
+              if (promptLower.includes(name.toLowerCase())) return true;
+              
+              // Then check if any significant keyword from the name appears as a whole word in the prompt
+              const keywords = name.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w));
+              for (const keyword of keywords) {
+                // Use word boundary matching to avoid false positives (e.g. "art" matching "cart")
+                const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+                if (regex.test(promptLower)) return true;
+              }
+              return false;
+            }
+            
+            // Track whether any actual characters (non-environment) are included
+            let hasNonEnvironmentReference = false;
+            
+            for (const char of charList) {
+              const isEnvironment = char.character_type === "environment";
+              const isInPrompt = nameMatchesPrompt(char.name, promptLowerForCharScan);
              
              // Only include reference image if the character/environment is mentioned by name in the prompt
              if (!isInPrompt) continue;
