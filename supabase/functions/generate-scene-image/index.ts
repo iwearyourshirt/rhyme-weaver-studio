@@ -190,14 +190,16 @@ function getShotTypeInstruction(shotType: string): string {
          const referenceImages: DownloadedImage[] = [];
          const includedCharacters: string[] = [];
          
-         for (const char of charList) {
-           const isEnvironment = char.character_type === "environment";
-           const isInScene = charactersInScene.some(
-             (name) => name.toLowerCase() === char.name.toLowerCase()
-           );
-           const isInPrompt = promptLowerForCharScan.includes(char.name.toLowerCase());
-           
-           if (!(isEnvironment || isInScene || isInPrompt)) continue;
+          for (const char of charList) {
+            const isEnvironment = char.character_type === "environment";
+            const isInScene = charactersInScene.some(
+              (name) => name.toLowerCase() === char.name.toLowerCase()
+            );
+            const isInPrompt = promptLowerForCharScan.includes(char.name.toLowerCase());
+            
+            // Only include if explicitly in characters_in_scene list OR mentioned by name in the prompt
+            // Environments are no longer auto-included — they must be referenced by name like characters
+            if (!(isInScene || isInPrompt)) continue;
            if (!char.primary_image_url) continue;
            
            console.log(`[BG] Downloading reference image for "${char.name}"`);
