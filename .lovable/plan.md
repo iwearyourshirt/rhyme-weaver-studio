@@ -1,76 +1,95 @@
 
 
-# Fix Rewrite AI: Over-generation, Character Handling, and Auto-save
+# Tighten Character and Environment References in Storyboard Generation
 
-## Problems to Fix
+## The Problem
 
-1. **Over-generation**: The AI pulls characters and details from `scene_description` even though it shouldn't. It re-describes characters instead of just referencing them by name.
-2. **Prompt reversion**: Rewritten prompts only live in local state -- refreshing the page loses them because they're never auto-saved to the database.
-3. **Character bloat**: The AI writes full character descriptions into prompts. Since the image generation pipeline already has access to character reference images and descriptions, prompts should just use character names.
+Looking at the current storyboard data, the issues are clear:
 
-## Plan
+- Scenes 3, 4, 5, 7, 8, 10 all have **empty** `characters_in_scene` arrays despite clearly featuring Webster
+- Image prompts say "a felted spider" or "the spider" instead of **"Webster"**
+- Environments like "The Garden" and "English Cottage" are never referenced by name -- prompts say "felted wool landscape" instead
+- Lavender (Webster's wife) never appears despite being a defined character
 
-### 1. Auto-save rewritten prompts to the database
+The root cause is in the system prompt instructions sent to GPT-4o. The current instructions tell the AI to write "a complete image generation prompt that combines the project's visual style with the scene description and character descriptions" -- this encourages the AI to re-describe characters generically rather than use their actual names.
 
-When the AI rewrites a prompt, immediately persist it so it survives page refreshes.
+## The Fix
 
-**Storyboard page (`src/pages/Storyboard.tsx`)**:
-- Change the `onRewrite` callback for both image and animation prompts to call `updateScene.mutateAsync()` with the new prompt, in addition to updating local state via `handleLocalEdit`.
+Update the `generate-storyboard` edge function's prompt instructions to enforce strict character and environment naming rules.
 
-**Image Generation SceneCard (`src/components/image-generation/SceneCard.tsx`)**:
-- Change `handlePromptRewritten` to call `onPromptSave({ image_prompt: newPrompt })` automatically after setting local state, so it persists to DB immediately.
+### Changes to `supabase/functions/generate-storyboard/index.ts`
 
-### 2. Fix the edge function system prompt to prevent over-generation
+**1. Add explicit naming rules to the system message:**
 
-**Edge function (`supabase/functions/rewrite-prompt/index.ts`)**:
+Add rules that tell GPT-4o:
+- Always use character names (e.g., "Webster", "Avery", "Lavender") -- never generic descriptions like "the spider" or "a young girl"
+- Always use environment names (e.g., "The Garden", "English Cottage") -- never generic descriptions like "a garden" or "a cottage"
+- Every scene MUST have a non-empty `characters_in_scene` array (at minimum the protagonist should appear in most scenes)
+- The image generation system has reference images for all characters and environments, so names are sufficient for visual consistency
 
-- Remove `scene_description` from the user message entirely, or limit it to a single-sentence summary. The scene description is the main source of hallucinated details (Avery, windowsill, starry sky).
-- Update the system prompt rules:
-  - Instruct the AI to reference characters **by name only**, never re-describe their appearance.
-  - Make it clear that the image generation pipeline handles visual consistency via reference images -- the prompt just needs names and actions.
-  - Strengthen the rule: "Do NOT add any characters, locations, or details not explicitly mentioned in the user's feedback or the current prompt."
-- When there's no current prompt and the AI is writing from scratch, provide only the user's feedback as source material (not the full scene description).
+**2. Update the image_prompt instruction (line 246):**
 
-### 3. Pass the shot type from local edits (not just DB value)
+Change from:
+> "a complete image generation prompt that combines the project's visual style with the scene description and character descriptions"
 
-On the Storyboard page, the `shotType` passed to `PromptFeedback` currently uses `scene.shot_type` (the DB value), but the user may have changed it locally without saving. Update to use the locally-edited value if present.
+To something like:
+> "a concise image generation prompt. Reference characters and environments BY NAME (e.g., 'Webster climbs the spout' not 'a felted spider climbs'). The image system has reference images for all characters/environments, so names alone ensure visual consistency. Focus on composition, action, and framing."
 
-**Storyboard page**: Change `shotType={scene.shot_type}` to `shotType={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}`.
+**3. Update the animation_prompt instruction similarly** to use character names, not generic descriptions.
 
-## Files to Modify
+**4. Add a character/environment name reminder at the end of the user message:**
+
+After the lyrics section, add a block like:
+```
+IMPORTANT - CHARACTER & ENVIRONMENT NAMING RULES:
+- Available characters: Webster, Avery, Lavender
+- Available environments: English Cottage, The Garden
+- ALWAYS use these exact names in scene_description, image_prompt, animation_prompt, and characters_in_scene
+- NEVER use generic descriptions like "the spider", "a girl", "a garden" -- use the character/environment name
+- Every scene should have at least one character in characters_in_scene
+```
+
+This dynamically lists all character and environment names so the AI has a clear reference.
+
+## What Stays the Same
+
+- Cinematic shot type variety (wide, close-up, two-shot, etc.) -- no changes
+- Creative brief / style direction handling -- no changes
+- Scene structure (one per lyric line) -- no changes
+- The rest of the pipeline (image generation, video generation) -- no changes
+
+## File to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/rewrite-prompt/index.ts` | Rework system prompt to prevent over-generation; remove/minimize scene_description usage; enforce name-only character references |
-| `src/pages/Storyboard.tsx` | Auto-save rewritten prompts to DB; pass locally-edited shot_type to PromptFeedback |
-| `src/components/image-generation/SceneCard.tsx` | Auto-save rewritten prompts to DB via `onPromptSave` |
+| `supabase/functions/generate-storyboard/index.ts` | Update system prompt and user message instructions to enforce character/environment naming |
 
 ## Technical Details
 
-### Updated system prompt approach
+The key prompt changes:
 
-```text
-RULES:
-1. Reference characters BY NAME ONLY. Never describe their appearance.
-   The image generation system has reference images for all characters.
-2. Only include characters/elements that appear in:
-   - The current prompt (preserve them), OR
-   - The user's feedback (add them)
-3. Do NOT invent locations, props, or atmospheric details not requested.
-4. Respect the selected shot type framing.
-5. Keep the prompt concise and focused on composition and action.
+**System message addition:**
+```
+When writing scene descriptions and prompts, ALWAYS refer to characters and environments 
+by their exact names. Never use generic descriptions like "the spider" or "a garden" — 
+use "Webster" and "The Garden". The image generation pipeline uses reference images keyed 
+to these names, so using exact names is critical for visual consistency.
 ```
 
-### Auto-save flow
+**User message -- replace image_prompt instruction:**
+```
+- image_prompt (a concise prompt for image generation. Reference all characters and 
+  environments BY THEIR EXACT NAMES — never generic descriptions. The image system has 
+  reference images for each character/environment, so names ensure consistency. Focus on 
+  action, composition, shot framing, and mood.)
+```
 
-```text
-User clicks Rewrite
-    |
-    v
-Edge function returns new prompt
-    |
-    +--> Update local state (instant UI update)
-    |
-    +--> Save to DB via updateScene (persist for refresh)
+**User message -- dynamic name reminder appended after instructions:**
+```
+CRITICAL NAMING RULES:
+- Character names to use: [Webster, Avery, Lavender]
+- Environment names to use: [English Cottage, The Garden]  
+- ALWAYS use these exact names in ALL fields. Never say "the spider" — say "Webster".
+- characters_in_scene must list every character visible in that scene.
 ```
 
