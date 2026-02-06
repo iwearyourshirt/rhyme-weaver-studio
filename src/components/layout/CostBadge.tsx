@@ -38,7 +38,7 @@ export function CostBadge() {
     const handleCostUpdate = (event: CustomEvent) => {
       if (event.detail?.projectId === projectId) {
         queryClient.invalidateQueries({ queryKey: ['cost-logs', projectId] });
-        queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+        queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
       }
     };
 
