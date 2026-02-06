@@ -107,6 +107,17 @@ export default function ImageGeneration() {
   const generateImage = async (sceneId: string) => {
     // Clear any previous toast tracking for this scene
     clearToastTracking(sceneId);
+    
+    // Reset image_status to 'pending' in the DB BEFORE adding to generatingIds
+    // This prevents the useEffect from immediately seeing 'done' and showing a toast
+    if (projectId) {
+      await updateScene.mutateAsync({
+        id: sceneId,
+        projectId,
+        updates: { image_status: 'pending' as any },
+      });
+    }
+    
     setGeneratingIds((prev) => new Set(prev).add(sceneId));
 
     const requestPayload = { scene_id: sceneId };
