@@ -1,103 +1,76 @@
 
-# Storyboard Scene Image Generation with 3:2 Aspect Ratio
 
-## Overview
-Create a new edge function `generate-scene-image` that uses OpenAI's `gpt-image-1` model with `1536x1024` resolution (3:2 aspect ratio) for generating scene images from the storyboard. Update the ImageGeneration page to use this edge function instead of placeholder images.
+# Fix Rewrite AI: Over-generation, Character Handling, and Auto-save
 
-## Current State
-- The ImageGeneration page uses **placeholder/mock images** (lines 48-58)
-- Character images use `gpt-image-1` at `1024x1024` (square) - this stays unchanged
-- Storage buckets exist: `audio`, `character-images`
-- `OPENAI_API_KEY` secret is already configured
+## Problems to Fix
 
-## Implementation Plan
+1. **Over-generation**: The AI pulls characters and details from `scene_description` even though it shouldn't. It re-describes characters instead of just referencing them by name.
+2. **Prompt reversion**: Rewritten prompts only live in local state -- refreshing the page loses them because they're never auto-saved to the database.
+3. **Character bloat**: The AI writes full character descriptions into prompts. Since the image generation pipeline already has access to character reference images and descriptions, prompts should just use character names.
 
-### 1. Create Storage Bucket for Scene Images
-Create a new public storage bucket `scene-images` via SQL migration with appropriate RLS policies for public read access.
+## Plan
 
-### 2. Create Edge Function: `generate-scene-image`
+### 1. Auto-save rewritten prompts to the database
 
-**Location:** `supabase/functions/generate-scene-image/index.ts`
+When the AI rewrites a prompt, immediately persist it so it survives page refreshes.
 
-**Input:**
-- `scene_id` - the scene to generate an image for
-- `project_id` - for storage path organization
+**Storyboard page (`src/pages/Storyboard.tsx`)**:
+- Change the `onRewrite` callback for both image and animation prompts to call `updateScene.mutateAsync()` with the new prompt, in addition to updating local state via `handleLocalEdit`.
 
-**Logic:**
-1. Fetch the scene record to get `image_prompt`
-2. Call OpenAI API with:
-   - Model: `gpt-image-1`
-   - Size: `1536x1024` (3:2 landscape ratio)
-   - Quality: `medium`
-3. Upload generated image to `scene-images` bucket
-4. Update scene record with new `image_url` and set `image_status` to `done`
-5. Return the image URL
+**Image Generation SceneCard (`src/components/image-generation/SceneCard.tsx`)**:
+- Change `handlePromptRewritten` to call `onPromptSave({ image_prompt: newPrompt })` automatically after setting local state, so it persists to DB immediately.
 
-**Key Difference from Character Images:**
-| Property | Character Images | Scene Images |
-|----------|-----------------|--------------|
-| Size | 1024x1024 | 1536x1024 |
-| Aspect | 1:1 (square) | 3:2 (landscape) |
-| Bucket | character-images | scene-images |
+### 2. Fix the edge function system prompt to prevent over-generation
 
-### 3. Update Config
-Add `generate-scene-image` function entry to `supabase/config.toml`
+**Edge function (`supabase/functions/rewrite-prompt/index.ts`)**:
 
-### 4. Update ImageGeneration Page
+- Remove `scene_description` from the user message entirely, or limit it to a single-sentence summary. The scene description is the main source of hallucinated details (Avery, windowsill, starry sky).
+- Update the system prompt rules:
+  - Instruct the AI to reference characters **by name only**, never re-describe their appearance.
+  - Make it clear that the image generation pipeline handles visual consistency via reference images -- the prompt just needs names and actions.
+  - Strengthen the rule: "Do NOT add any characters, locations, or details not explicitly mentioned in the user's feedback or the current prompt."
+- When there's no current prompt and the AI is writing from scratch, provide only the user's feedback as source material (not the full scene description).
 
-**Changes to `src/pages/ImageGeneration.tsx`:**
+### 3. Pass the shot type from local edits (not just DB value)
 
-1. **Replace mock generation with edge function call:**
-   - Remove placeholder image logic
-   - Call `generate-scene-image` edge function via `supabase.functions.invoke()`
+On the Storyboard page, the `shotType` passed to `PromptFeedback` currently uses `scene.shot_type` (the DB value), but the user may have changed it locally without saving. Update to use the locally-edited value if present.
 
-2. **Update aspect ratio:**
-   - Change `aspect-square` to `aspect-[3/2]` on scene cards for proper 3:2 display
+**Storyboard page**: Change `shotType={scene.shot_type}` to `shotType={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}`.
 
-3. **Add debug logging:**
-   - Log the full API request/response to the debug panel
+## Files to Modify
 
-4. **Keep existing features:**
-   - Generate All button
-   - Individual generate/regenerate buttons
-   - Progress tracking
-   - Status badges
+| File | Change |
+|------|--------|
+| `supabase/functions/rewrite-prompt/index.ts` | Rework system prompt to prevent over-generation; remove/minimize scene_description usage; enforce name-only character references |
+| `src/pages/Storyboard.tsx` | Auto-save rewritten prompts to DB; pass locally-edited shot_type to PromptFeedback |
+| `src/components/image-generation/SceneCard.tsx` | Auto-save rewritten prompts to DB via `onPromptSave` |
 
 ## Technical Details
 
-### Edge Function Structure
+### Updated system prompt approach
+
 ```text
-generate-scene-image/
-  index.ts
+RULES:
+1. Reference characters BY NAME ONLY. Never describe their appearance.
+   The image generation system has reference images for all characters.
+2. Only include characters/elements that appear in:
+   - The current prompt (preserve them), OR
+   - The user's feedback (add them)
+3. Do NOT invent locations, props, or atmospheric details not requested.
+4. Respect the selected shot type framing.
+5. Keep the prompt concise and focused on composition and action.
 ```
 
-### API Flow
+### Auto-save flow
+
 ```text
-ImageGeneration Page
-        |
-        v
-generate-scene-image (Edge Function)
-        |
-        +--> Fetch scene from DB (get image_prompt)
-        |
-        +--> OpenAI API (gpt-image-1, 1536x1024, medium)
-        |
-        +--> Upload to scene-images bucket
-        |
-        +--> Update scene record (image_url, image_status)
-        |
-        v
-Return image URL
+User clicks Rewrite
+    |
+    v
+Edge function returns new prompt
+    |
+    +--> Update local state (instant UI update)
+    |
+    +--> Save to DB via updateScene (persist for refresh)
 ```
 
-### Storage Path Format
-`{project_id}/{scene_id}/{timestamp}.png`
-
-## Files to Create/Modify
-
-| File | Action | Purpose |
-|------|--------|---------|
-| SQL Migration | Create | scene-images storage bucket + RLS |
-| `supabase/functions/generate-scene-image/index.ts` | Create | Edge function for scene image generation |
-| `supabase/config.toml` | Modify | Add function entry |
-| `src/pages/ImageGeneration.tsx` | Modify | Use edge function, update aspect ratio |
