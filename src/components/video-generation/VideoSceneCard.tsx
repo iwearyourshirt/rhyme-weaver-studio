@@ -59,18 +59,21 @@ export function VideoSceneCard({
   const [editedPrompt, setEditedPrompt] = useState(scene.animation_prompt);
   const videoRef = useRef<HTMLVideoElement>(null);
   const startTimeRef = useRef<number | null>(null);
+  // Track whether this generation was initiated in-session vs already running on mount
+  const isResumedRef = useRef(false);
 
-  // Timer effect for generation progress - always show timer when generating
+  // Timer effect for generation progress
   useEffect(() => {
     const isActuallyGeneratingNow = scene.video_status === 'generating';
     
     if (isActuallyGeneratingNow) {
-      // Start timer if not already started
       if (!startTimeRef.current) {
+        // If we didn't initiate this generation (isGenerating from parent is false),
+        // it's a resumed/in-progress generation from before page load
+        isResumedRef.current = !isGenerating;
         startTimeRef.current = Date.now();
       }
 
-      // Run timer
       const interval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTimeRef.current!) / 1000);
         setElapsedTime(elapsed);
@@ -78,8 +81,8 @@ export function VideoSceneCard({
 
       return () => clearInterval(interval);
     } else {
-      // Reset when done/failed
       startTimeRef.current = null;
+      isResumedRef.current = false;
       setElapsedTime(0);
     }
   }, [scene.video_status]);
@@ -197,12 +200,20 @@ export function VideoSceneCard({
             <div className="absolute inset-0 bg-background/95 flex flex-col items-center justify-center gap-2 p-4">
               <div className="animate-spin rounded-full h-5 w-5 border-2 border-foreground border-t-transparent" />
               <p className="text-xs font-medium">{isCancelling ? 'Cancelling...' : 'Generating...'}</p>
-              <div className="w-24">
-                <Progress value={progressPercent} className="h-1" />
-              </div>
-              <p className="text-[10px] text-muted-foreground font-mono">
-                {elapsedTime}s • {getTimeDisplay()}
-              </p>
+              {isResumedRef.current ? (
+                <p className="text-[10px] text-muted-foreground font-mono">
+                  In progress — waiting for result...
+                </p>
+              ) : (
+                <>
+                  <div className="w-24">
+                    <Progress value={progressPercent} className="h-1" />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-mono">
+                    {elapsedTime}s • {getTimeDisplay()}
+                  </p>
+                </>
+              )}
               <Button
                 variant="outline"
                 size="sm"
