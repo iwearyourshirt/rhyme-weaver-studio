@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -102,9 +102,16 @@ export function VideoSceneCard({
     setIsPlaying(false);
   };
 
-  const handlePromptBlur = async () => {
-    if (editedPrompt !== scene.animation_prompt) {
+  const [isSaving, setIsSaving] = useState(false);
+  const hasPromptChanges = editedPrompt !== scene.animation_prompt;
+
+  const handleSavePrompt = async () => {
+    if (!hasPromptChanges) return;
+    setIsSaving(true);
+    try {
       await onUpdatePrompt(editedPrompt);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -272,10 +279,21 @@ export function VideoSceneCard({
               <Textarea
                 value={editedPrompt}
                 onChange={(e) => setEditedPrompt(e.target.value)}
-                onBlur={handlePromptBlur}
                 className="text-xs min-h-[60px] resize-none"
                 placeholder="Animation prompt..."
               />
+              {hasPromptChanges && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-8 text-xs"
+                  onClick={handleSavePrompt}
+                  disabled={isSaving}
+                >
+                  <Save className="h-3 w-3 mr-1.5" />
+                  {isSaving ? 'Saving...' : 'Save Prompt'}
+                </Button>
+              )}
               <PromptFeedback
                 currentPrompt={editedPrompt}
                 sceneDescription={scene.scene_description}
@@ -291,7 +309,7 @@ export function VideoSceneCard({
             variant={scene.video_status === 'done' ? 'outline' : 'default'}
             className="w-full h-9"
             onClick={onGenerate}
-            disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating'}
+            disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating' || hasPromptChanges}
           >
             {scene.video_status === 'done' ? (
               <>
