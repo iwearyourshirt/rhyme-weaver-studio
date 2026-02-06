@@ -153,10 +153,10 @@ export function VideoSceneCard({
 
   return (
     <Card className="border overflow-hidden">
-      {/* Responsive layout */}
-      <div className="flex flex-col">
+      {/* Horizontal layout: video left, controls right */}
+      <div className="flex flex-row">
         {/* Video/Image Area */}
-        <div className="aspect-video bg-muted relative">
+        <div className="w-1/2 aspect-video bg-muted relative flex-shrink-0">
           {scene.video_status === 'done' && scene.video_url ? (
             <>
               <video
@@ -234,8 +234,8 @@ export function VideoSceneCard({
           )}
         </div>
 
-        {/* Content Area - consistent 16px padding, 12px gaps */}
-        <CardContent className="p-4 space-y-3">
+        {/* Content Area */}
+        <CardContent className="w-1/2 p-4 space-y-3 overflow-y-auto">
           {/* Row 1: Scene number + Status */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Scene {scene.scene_number}</span>
