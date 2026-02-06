@@ -6,13 +6,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const FELTED_STYLE_PREFIX = `Professional needle-felted wool character for a stop-motion animated children's show. High-quality handcrafted felted wool figure with visible wool fiber texture. Photographed with a macro lens, shallow depth of field, warm golden-hour natural light, soft green bokeh background. Always show the full character from top to bottom, never cropped.`;
+const CHARACTER_STYLE_PREFIX = `Professional needle-felted wool character for a stop-motion animated children's show. High-quality handcrafted felted wool figure with visible wool fiber texture. Photographed with a macro lens, shallow depth of field, warm golden-hour natural light, soft green bokeh background. Always show the full character from top to bottom, never cropped.`;
 
-// 3 angle variations: side profile, three-quarter back, and back view
-const ANGLE_SUFFIXES = [
+const ENVIRONMENT_STYLE_PREFIX = `Professional needle-felted wool environment/setting for a stop-motion animated children's show. This is a PLACE or LOCATION, not a character or creature. High-quality handcrafted felted wool landscape, set piece, or backdrop with visible wool fiber texture throughout. Photographed with a macro lens, warm golden-hour natural light. No characters, figures, or creatures should appear — only the setting itself.`;
+
+// 3 angle variations for characters
+const CHARACTER_ANGLE_SUFFIXES = [
   "Same exact character shown from the left side profile view.",
   "Same exact character shown from a three-quarter back view, looking over shoulder.",
   "Same exact character shown from directly behind.",
+];
+
+// 3 angle variations for environments
+const ENVIRONMENT_ANGLE_SUFFIXES = [
+  "Same exact environment shown from a different angle, looking from the left side.",
+  "Same exact environment shown from a bird's-eye elevated view, looking down at the setting.",
+  "Same exact environment shown from a low ground-level perspective, looking up.",
 ];
 
 interface OpenAIImageResponse {
@@ -53,7 +62,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { character_name, character_description, primary_image_url, project_id, character_id } = await req.json();
+    const { character_name, character_description, primary_image_url, project_id, character_id, character_type } = await req.json();
     
     if (!character_name || !character_description) {
       throw new Error("character_name and character_description are required");
@@ -81,14 +90,17 @@ Deno.serve(async (req) => {
     const primaryImageContentType = imageResponse.headers.get("content-type") ?? "image/png";
     console.log("Primary image downloaded, bytes:", primaryImageBytes.length, "type:", primaryImageContentType);
 
+    const isEnvironment = character_type === 'environment';
+    const stylePrefix = isEnvironment ? ENVIRONMENT_STYLE_PREFIX : CHARACTER_STYLE_PREFIX;
+    const angleSuffixes = isEnvironment ? ENVIRONMENT_ANGLE_SUFFIXES : CHARACTER_ANGLE_SUFFIXES;
     const timestamp = Date.now();
     const generatedPrompts: string[] = [];
 
     // Generate all angle images in parallel using OpenAI image edit
-    const imagePromises = ANGLE_SUFFIXES.map(async (suffix, index) => {
-      const fullPrompt = `${FELTED_STYLE_PREFIX}\n\n${character_description}\n\n${suffix}`;
+    const imagePromises = angleSuffixes.map(async (suffix, index) => {
+      const fullPrompt = `${stylePrefix}\n\n${character_description}\n\n${suffix}`;
       
-      console.log(`Generating angle ${index + 1}/${ANGLE_SUFFIXES.length}...`);
+      console.log(`Generating angle ${index + 1}/${angleSuffixes.length}...`);
       console.log(`Full prompt: ${fullPrompt}`);
       generatedPrompts.push(fullPrompt);
       
@@ -121,7 +133,7 @@ Deno.serve(async (req) => {
       }
 
       const data: OpenAIImageResponse = await response.json();
-      console.log(`Angle ${index + 1}/${ANGLE_SUFFIXES.length} generated successfully`);
+      console.log(`Angle ${index + 1}/${angleSuffixes.length} generated successfully`);
       
       // Prefer base64 response; fall back to URL if provided
       let binaryData: Uint8Array | null = null;

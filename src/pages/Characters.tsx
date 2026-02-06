@@ -164,6 +164,7 @@ export default function Characters() {
         primary_image_url: character.primary_image_url,
         project_id: projectId,
         character_id: character.id,
+        character_type: character.character_type,
       };
       
       console.log('Calling generate-consistent-angles edge function...');
