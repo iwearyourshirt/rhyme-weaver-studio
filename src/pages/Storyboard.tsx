@@ -365,7 +365,7 @@ export default function Storyboard() {
  
    if (isLoading) {
      return (
-       <div className="max-w-4xl mx-auto animate-pulse space-y-6">
+       <div className="max-w-6xl mx-auto animate-pulse space-y-6">
          <div className="h-8 bg-muted rounded w-1/3" />
          <div className="space-y-4">
            {[1, 2, 3].map((i) => (
@@ -377,16 +377,16 @@ export default function Storyboard() {
    }
  
    return (
-     <div className="max-w-4xl mx-auto animate-fade-in space-y-8">
-       <div className="flex items-center justify-between">
-         <div>
-           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-             Storyboard
-           </h1>
-           <p className="text-sm text-muted-foreground mt-1">
-             Plan each scene of your animated video
-           </p>
-         </div>
+      <div className="max-w-6xl mx-auto animate-fade-in space-y-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Storyboard
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Plan each scene of your animated video
+            </p>
+          </div>
          <div className="flex gap-2">
            {scenes && scenes.length > 0 && (
              <AlertDialog>
@@ -524,184 +524,190 @@ export default function Storyboard() {
                     </div>
                   </CardHeader>
 
-                  {/* Card Content */}
-                  <CardContent className="p-4 space-y-4">
-                    {/* Lyric snippet */}
-                    <p className="text-sm text-muted-foreground italic">
-                      "{scene.lyric_snippet}"
-                    </p>
-
-                    {/* Image + Description row */}
-                    <div className="flex gap-4">
-                      <button
-                        onClick={() => navigate(`/project/${projectId}/images`)}
-                        className="w-20 h-20 flex-shrink-0 rounded border bg-muted/30 flex items-center justify-center overflow-hidden hover:opacity-80 transition-opacity"
-                      >
-                        {scene.image_url ? (
-                          <img src={scene.image_url} alt={`Scene ${scene.scene_number}`} className="w-full h-full object-cover" />
-                        ) : (
-                          <ImageIcon className="h-5 w-5 text-muted-foreground/30" />
-                        )}
-                      </button>
-                      <div className="flex-1 space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Scene Description</Label>
-                        <Textarea
-                          value={getEditedValue(scene, 'scene_description')}
-                          onChange={(e) => handleLocalEdit(scene.id, 'scene_description', e.target.value)}
-                          placeholder="Describe what happens in this scene..."
-                          className="min-h-[72px] text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Shot + Characters row */}
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <Camera className="h-3.5 w-3.5 text-muted-foreground" />
-                        <Select
-                          value={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
-                          onValueChange={(value) => handleLocalEdit(scene.id, 'shot_type', value as ShotType)}
+                  {/* Card Content - Horizontal layout on desktop */}
+                  <CardContent className="p-4 pt-3">
+                    <div className="flex flex-col lg:flex-row gap-4">
+                      {/* Left column: Image thumbnail + metadata */}
+                      <div className="flex flex-row lg:flex-col gap-3 lg:w-48 flex-shrink-0">
+                        <button
+                          onClick={() => navigate(`/project/${projectId}/images`)}
+                          className="w-20 h-20 lg:w-full lg:h-32 flex-shrink-0 rounded border bg-muted/30 flex items-center justify-center overflow-hidden hover:opacity-80 transition-opacity"
                         >
-                          <SelectTrigger className="h-9 w-36">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {SHOT_TYPE_OPTIONS.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          {scene.image_url ? (
+                            <img src={scene.image_url} alt={`Scene ${scene.scene_number}`} className="w-full h-full object-cover" />
+                          ) : (
+                            <ImageIcon className="h-5 w-5 text-muted-foreground/30" />
+                          )}
+                        </button>
+                        <div className="flex flex-row lg:flex-col gap-2 flex-1">
+                          <p className="text-sm text-muted-foreground italic line-clamp-2 lg:line-clamp-3 leading-relaxed">
+                            "{scene.lyric_snippet}"
+                          </p>
+                          <div className="flex items-center gap-2 lg:mt-auto">
+                            <Camera className="h-3.5 w-3.5 text-muted-foreground" />
+                            <Select
+                              value={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
+                              onValueChange={(value) => handleLocalEdit(scene.id, 'shot_type', value as ShotType)}
+                            >
+                              <SelectTrigger className="h-8 w-full text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {SHOT_TYPE_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Characters:</span>
-                        <div className="flex flex-wrap gap-1">
-                          {(() => {
-                            const currentChars = sceneEdits[scene.id]?.characters_in_scene ?? scene.characters_in_scene;
-                            const characterOptions = (characters || []).filter(c => c.character_type !== 'environment');
-                            return (
-                              <>
-                                {currentChars.map((charName, idx) => (
-                                  <Badge
-                                    key={idx}
-                                    variant="secondary"
-                                    className="text-xs h-6 cursor-pointer hover:bg-destructive/20 hover:line-through"
-                                    onClick={() => {
-                                      const updated = currentChars.filter((_, i) => i !== idx);
-                                      handleLocalEdit(scene.id, 'characters_in_scene' as any, updated as any);
-                                    }}
-                                    title="Click to remove"
-                                  >
-                                    {charName}
-                                  </Badge>
-                                ))}
-                                {characterOptions.filter(c => !currentChars.includes(c.name)).length > 0 && (
-                                  <Select
-                                    value=""
-                                    onValueChange={(name) => {
-                                      const updated = [...currentChars, name];
-                                      handleLocalEdit(scene.id, 'characters_in_scene' as any, updated as any);
-                                    }}
-                                  >
-                                    <SelectTrigger className="h-6 w-6 p-0 border-dashed rounded-full [&>svg]:hidden">
-                                      <Plus className="h-3 w-3" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {characterOptions
-                                        .filter(c => !currentChars.includes(c.name))
-                                        .map(c => (
-                                          <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                                        ))
-                                      }
-                                    </SelectContent>
-                                  </Select>
-                                )}
-                                {currentChars.length === 0 && characterOptions.length === 0 && (
-                                  <span className="text-xs text-muted-foreground/50">None</span>
-                                )}
-                              </>
-                            );
-                          })()}
+                      {/* Right column: Description, characters, prompts */}
+                      <div className="flex-1 space-y-3 min-w-0">
+                        {/* Scene Description */}
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Scene Description</Label>
+                          <Textarea
+                            value={getEditedValue(scene, 'scene_description')}
+                            onChange={(e) => handleLocalEdit(scene.id, 'scene_description', e.target.value)}
+                            placeholder="Describe what happens in this scene..."
+                            className="min-h-[72px] text-sm"
+                          />
                         </div>
+
+                        {/* Characters */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-muted-foreground">Characters:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {(() => {
+                              const currentChars = sceneEdits[scene.id]?.characters_in_scene ?? scene.characters_in_scene;
+                              const characterOptions = (characters || []).filter(c => c.character_type !== 'environment');
+                              return (
+                                <>
+                                  {currentChars.map((charName, idx) => (
+                                    <Badge
+                                      key={idx}
+                                      variant="secondary"
+                                      className="text-xs h-6 cursor-pointer hover:bg-destructive/20 hover:line-through"
+                                      onClick={() => {
+                                        const updated = currentChars.filter((_, i) => i !== idx);
+                                        handleLocalEdit(scene.id, 'characters_in_scene' as any, updated as any);
+                                      }}
+                                      title="Click to remove"
+                                    >
+                                      {charName}
+                                    </Badge>
+                                  ))}
+                                  {characterOptions.filter(c => !currentChars.includes(c.name)).length > 0 && (
+                                    <Select
+                                      value=""
+                                      onValueChange={(name) => {
+                                        const updated = [...currentChars, name];
+                                        handleLocalEdit(scene.id, 'characters_in_scene' as any, updated as any);
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-6 w-6 p-0 border-dashed rounded-full [&>svg]:hidden">
+                                        <Plus className="h-3 w-3" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {characterOptions
+                                          .filter(c => !currentChars.includes(c.name))
+                                          .map(c => (
+                                            <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                                          ))
+                                        }
+                                      </SelectContent>
+                                    </Select>
+                                  )}
+                                  {currentChars.length === 0 && characterOptions.length === 0 && (
+                                    <span className="text-xs text-muted-foreground/50">None</span>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* Prompts collapsible */}
+                        <Collapsible
+                          open={expandedPrompts[scene.id]}
+                          onOpenChange={() => togglePromptExpanded(scene.id)}
+                        >
+                          <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="sm" className="px-0 h-8 hover:bg-transparent">
+                              {expandedPrompts[scene.id] ? <ChevronUp className="h-3.5 w-3.5 mr-1.5" /> : <ChevronDown className="h-3.5 w-3.5 mr-1.5" />}
+                              <span className="text-xs font-medium">Show Prompts</span>
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="space-y-4 pt-3">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">Image Prompt</Label>
+                                <Textarea
+                                  value={getEditedValue(scene, 'image_prompt')}
+                                  onChange={(e) => handleLocalEdit(scene.id, 'image_prompt', e.target.value)}
+                                  className="min-h-[72px] text-sm"
+                                />
+                                <PromptFeedback
+                                  currentPrompt={getEditedValue(scene, 'image_prompt')}
+                                  sceneDescription={getEditedValue(scene, 'scene_description')}
+                                  promptType="image"
+                                  shotType={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
+                                  siblingPrompt={getEditedValue(scene, 'animation_prompt')}
+                                  onRewrite={(newPrompt) => {
+                                    handleLocalEdit(scene.id, 'image_prompt', newPrompt);
+                                    if (projectId) {
+                                      const charNames = (characters || [])
+                                        .filter(c => c.character_type !== 'environment' && newPrompt.toLowerCase().includes(c.name.toLowerCase()))
+                                        .map(c => c.name);
+                                      updateScene.mutateAsync({ id: scene.id, projectId, updates: { image_prompt: newPrompt, characters_in_scene: charNames } });
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">Animation Prompt</Label>
+                                <Textarea
+                                  value={getEditedValue(scene, 'animation_prompt')}
+                                  onChange={(e) => handleLocalEdit(scene.id, 'animation_prompt', e.target.value)}
+                                  className="min-h-[72px] text-sm"
+                                />
+                                <PromptFeedback
+                                  currentPrompt={getEditedValue(scene, 'animation_prompt')}
+                                  sceneDescription={getEditedValue(scene, 'scene_description')}
+                                  promptType="animation"
+                                  shotType={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
+                                  siblingPrompt={getEditedValue(scene, 'image_prompt')}
+                                  onRewrite={(newPrompt) => {
+                                    handleLocalEdit(scene.id, 'animation_prompt', newPrompt);
+                                    if (projectId) {
+                                      const charNames = (characters || [])
+                                        .filter(c => c.character_type !== 'environment' && newPrompt.toLowerCase().includes(c.name.toLowerCase()))
+                                        .map(c => c.name);
+                                      updateScene.mutateAsync({ id: scene.id, projectId, updates: { animation_prompt: newPrompt, characters_in_scene: charNames } });
+                                    }
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+
+                        {/* Save button */}
+                        {hasUnsavedChanges(scene.id) && (
+                          <Button
+                            onClick={() => handleSaveChanges(scene.id)}
+                            disabled={savingSceneId === scene.id}
+                            className="h-9"
+                          >
+                            {savingSceneId === scene.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+                            Save Changes
+                          </Button>
+                        )}
                       </div>
                     </div>
-
-                    {/* Prompts collapsible */}
-                    <Collapsible
-                      open={expandedPrompts[scene.id]}
-                      onOpenChange={() => togglePromptExpanded(scene.id)}
-                    >
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="px-0 h-8 hover:bg-transparent">
-                          {expandedPrompts[scene.id] ? <ChevronUp className="h-3.5 w-3.5 mr-1.5" /> : <ChevronDown className="h-3.5 w-3.5 mr-1.5" />}
-                          <span className="text-xs font-medium">Show Prompts</span>
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-4 pt-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">Image Prompt</Label>
-                          <Textarea
-                            value={getEditedValue(scene, 'image_prompt')}
-                            onChange={(e) => handleLocalEdit(scene.id, 'image_prompt', e.target.value)}
-                            className="min-h-[72px] text-sm"
-                          />
-                          <PromptFeedback
-                            currentPrompt={getEditedValue(scene, 'image_prompt')}
-                            sceneDescription={getEditedValue(scene, 'scene_description')}
-                            promptType="image"
-                            shotType={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
-                            siblingPrompt={getEditedValue(scene, 'animation_prompt')}
-                            onRewrite={(newPrompt) => {
-                              handleLocalEdit(scene.id, 'image_prompt', newPrompt);
-                              if (projectId) {
-                                const charNames = (characters || [])
-                                  .filter(c => c.character_type !== 'environment' && newPrompt.toLowerCase().includes(c.name.toLowerCase()))
-                                  .map(c => c.name);
-                                updateScene.mutateAsync({ id: scene.id, projectId, updates: { image_prompt: newPrompt, characters_in_scene: charNames } });
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">Animation Prompt</Label>
-                          <Textarea
-                            value={getEditedValue(scene, 'animation_prompt')}
-                            onChange={(e) => handleLocalEdit(scene.id, 'animation_prompt', e.target.value)}
-                            className="min-h-[72px] text-sm"
-                          />
-                          <PromptFeedback
-                            currentPrompt={getEditedValue(scene, 'animation_prompt')}
-                            sceneDescription={getEditedValue(scene, 'scene_description')}
-                            promptType="animation"
-                            shotType={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
-                            siblingPrompt={getEditedValue(scene, 'image_prompt')}
-                            onRewrite={(newPrompt) => {
-                              handleLocalEdit(scene.id, 'animation_prompt', newPrompt);
-                              if (projectId) {
-                                const charNames = (characters || [])
-                                  .filter(c => c.character_type !== 'environment' && newPrompt.toLowerCase().includes(c.name.toLowerCase()))
-                                  .map(c => c.name);
-                                updateScene.mutateAsync({ id: scene.id, projectId, updates: { animation_prompt: newPrompt, characters_in_scene: charNames } });
-                              }
-                            }}
-                          />
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-
-                    {/* Save button */}
-                    {hasUnsavedChanges(scene.id) && (
-                      <Button
-                        onClick={() => handleSaveChanges(scene.id)}
-                        disabled={savingSceneId === scene.id}
-                        className="h-9"
-                      >
-                        {savingSceneId === scene.id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
-                        Save Changes
-                      </Button>
-                    )}
                   </CardContent>
                 </Card>
 
