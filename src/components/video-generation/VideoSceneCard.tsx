@@ -23,6 +23,7 @@ interface VideoSceneCardProps {
   scene: Scene;
   projectId: string;
   isGenerating: boolean;
+  anyGenerating?: boolean;
   isCancelling?: boolean;
   onGenerate: () => void;
   onCancel: () => void;
@@ -45,6 +46,7 @@ export function VideoSceneCard({
   scene,
   projectId,
   isGenerating,
+  anyGenerating = false,
   isCancelling = false,
   onGenerate,
   onCancel,
@@ -309,7 +311,7 @@ export function VideoSceneCard({
             variant={scene.video_status === 'done' ? 'outline' : 'default'}
             className="w-full h-9"
             onClick={onGenerate}
-            disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating' || hasPromptChanges}
+            disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating' || hasPromptChanges || (anyGenerating && !isGenerating)}
           >
             {scene.video_status === 'done' ? (
               <>
