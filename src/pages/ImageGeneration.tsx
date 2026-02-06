@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowRight, Wand2, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { useDebug } from '@/contexts/DebugContext';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { SceneCard } from '@/components/image-generation/SceneCard';
-import type { ShotType } from '@/types/database';
+import type { Scene, ShotType } from '@/types/database';
 
 export default function ImageGeneration() {
   const { projectId } = useParams();
@@ -20,6 +21,7 @@ export default function ImageGeneration() {
   const { data: scenes, isLoading } = useScenes(projectId);
   const updateScene = useUpdateScene();
   const updateProject = useUpdateProject();
+  const queryClient = useQueryClient();
   const { setCurrentPage, setProjectData, logApiCall } = useDebug();
 
   // Enable realtime updates and get refetch function
@@ -108,14 +110,22 @@ export default function ImageGeneration() {
     // Clear any previous toast tracking for this scene
     clearToastTracking(sceneId);
     
-    // Reset image_status to 'pending' in the DB BEFORE adding to generatingIds
-    // This prevents the useEffect from immediately seeing 'done' and showing a toast
+    // Optimistically update the react-query cache to 'pending' SYNCHRONOUSLY
+    // This prevents the useEffect from seeing stale 'done' status when generatingIds updates
+    queryClient.setQueryData(['scenes', projectId], (old: Scene[] | undefined) => {
+      if (!old) return old;
+      return old.map(s => s.id === sceneId ? { ...s, image_status: 'pending' } : s);
+    });
+    
+    // Update DB in background (don't await to avoid invalidation race)
     if (projectId) {
-      await updateScene.mutateAsync({
-        id: sceneId,
-        projectId,
-        updates: { image_status: 'pending' as any },
-      });
+      supabase
+        .from('scenes')
+        .update({ image_status: 'pending' })
+        .eq('id', sceneId)
+        .then(({ error }) => {
+          if (error) console.error('Failed to reset image_status:', error);
+        });
     }
     
     setGeneratingIds((prev) => new Set(prev).add(sceneId));
