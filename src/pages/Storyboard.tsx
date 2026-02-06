@@ -54,6 +54,7 @@ interface SceneEdits {
   image_prompt?: string;
   animation_prompt?: string;
   shot_type?: ShotType;
+  characters_in_scene?: string[];
 }
 
 const SHOT_TYPE_OPTIONS: { value: ShotType; label: string }[] = [
@@ -141,21 +142,21 @@ export default function Storyboard() {
      }));
    };
  
-   const handleLocalEdit = (sceneId: string, field: keyof SceneEdits, value: string) => {
-     setSceneEdits(prev => ({
-       ...prev,
-       [sceneId]: {
-         ...prev[sceneId],
-         [field]: value,
-       },
-     }));
-   };
+    const handleLocalEdit = (sceneId: string, field: keyof SceneEdits, value: string | string[]) => {
+      setSceneEdits(prev => ({
+        ...prev,
+        [sceneId]: {
+          ...prev[sceneId],
+          [field]: value,
+        },
+      }));
+    };
  
-   const getEditedValue = (scene: Scene, field: keyof SceneEdits): string => {
-     const edit = sceneEdits[scene.id]?.[field];
-     if (edit !== undefined) return edit;
-     return scene[field] as string;
-   };
+    const getEditedValue = (scene: Scene, field: keyof SceneEdits): any => {
+      const edit = sceneEdits[scene.id]?.[field];
+      if (edit !== undefined) return edit;
+      return scene[field];
+    };
  
    const hasUnsavedChanges = (sceneId: string): boolean => {
      return !!sceneEdits[sceneId] && Object.keys(sceneEdits[sceneId]).length > 0;
@@ -574,16 +575,57 @@ export default function Storyboard() {
                         </Select>
                       </div>
 
-                      {scene.characters_in_scene.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">Characters:</span>
-                          <div className="flex flex-wrap gap-1">
-                            {scene.characters_in_scene.map((charName, idx) => (
-                              <Badge key={idx} variant="secondary" className="text-xs h-6">{charName}</Badge>
-                            ))}
-                          </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Characters:</span>
+                        <div className="flex flex-wrap gap-1">
+                          {(() => {
+                            const currentChars = sceneEdits[scene.id]?.characters_in_scene ?? scene.characters_in_scene;
+                            const characterOptions = (characters || []).filter(c => c.character_type !== 'environment');
+                            return (
+                              <>
+                                {currentChars.map((charName, idx) => (
+                                  <Badge
+                                    key={idx}
+                                    variant="secondary"
+                                    className="text-xs h-6 cursor-pointer hover:bg-destructive/20 hover:line-through"
+                                    onClick={() => {
+                                      const updated = currentChars.filter((_, i) => i !== idx);
+                                      handleLocalEdit(scene.id, 'characters_in_scene' as any, updated as any);
+                                    }}
+                                    title="Click to remove"
+                                  >
+                                    {charName}
+                                  </Badge>
+                                ))}
+                                {characterOptions.filter(c => !currentChars.includes(c.name)).length > 0 && (
+                                  <Select
+                                    value=""
+                                    onValueChange={(name) => {
+                                      const updated = [...currentChars, name];
+                                      handleLocalEdit(scene.id, 'characters_in_scene' as any, updated as any);
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-6 w-6 p-0 border-dashed rounded-full [&>svg]:hidden">
+                                      <Plus className="h-3 w-3" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {characterOptions
+                                        .filter(c => !currentChars.includes(c.name))
+                                        .map(c => (
+                                          <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                                        ))
+                                      }
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                                {currentChars.length === 0 && characterOptions.length === 0 && (
+                                  <span className="text-xs text-muted-foreground/50">None</span>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {/* Prompts collapsible */}
