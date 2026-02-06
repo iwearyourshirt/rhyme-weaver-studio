@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useProject, useUpdateProject } from '@/hooks/useProjects';
 import { useScenes, useUpdateScene } from '@/hooks/useScenes';
+import { useCharacters } from '@/hooks/useCharacters';
 import { useScenesRealtime } from '@/hooks/useScenesRealtime';
 import { useDebug } from '@/contexts/DebugContext';
 import { toast } from 'sonner';
@@ -19,6 +20,7 @@ export default function ImageGeneration() {
   const navigate = useNavigate();
   const { data: project } = useProject(projectId);
   const { data: scenes, isLoading } = useScenes(projectId);
+  const { data: characters } = useCharacters(projectId);
   const updateScene = useUpdateScene();
   const updateProject = useUpdateProject();
   const queryClient = useQueryClient();
@@ -336,6 +338,13 @@ export default function ImageGeneration() {
               onGenerate={() => generateImage(scene.id)}
               onApprovalChange={(approved) => handleApprovalChange(scene.id, approved)}
               onPromptSave={(updates) => handlePromptSave(scene.id, updates)}
+              onCharactersUpdate={(newPrompt) => {
+                if (!projectId) return;
+                const charNames = (characters || [])
+                  .filter(c => c.character_type !== 'environment' && newPrompt.toLowerCase().includes(c.name.toLowerCase()))
+                  .map(c => c.name);
+                updateScene.mutateAsync({ id: scene.id, projectId, updates: { characters_in_scene: charNames } });
+              }}
             />
           ))}
         </div>

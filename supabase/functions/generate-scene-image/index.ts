@@ -196,70 +196,75 @@ function getShotTypeInstruction(shotType: string): string {
      const charList = (characters || []) as Character[];
      console.log(`Found ${charList.length} characters in project`);
      
-     // Determine which characters to include:
-     // 1. Environment characters ALWAYS get included
-     // 2. Regular characters only if they appear in characters_in_scene (case-insensitive)
-     const charactersInScene = (scene.characters_in_scene || []) as string[];
-     const referenceImages: DownloadedImage[] = [];
-     const includedCharacters: string[] = [];
-     const skippedCharacters: string[] = [];
-     const includedAsEnvironment: string[] = [];
-     const includedAsCharacterMatch: string[] = [];
-     
-     // Process all characters
-     for (const char of charList) {
-       const isEnvironment = char.character_type === "environment";
-       const isInScene = charactersInScene.some(
-         (name) => name.toLowerCase() === char.name.toLowerCase()
-       );
-       
-       // Include if it's an environment character OR if it's a regular character in the scene
-       const shouldInclude = isEnvironment || isInScene;
-       
-       if (!shouldInclude) {
-         console.log(`Character "${char.name}" is not in scene and not environment - skipping`);
-         continue;
-       }
-       
-       if (!char.primary_image_url) {
-         console.log(`Character "${char.name}" has no reference image - skipping`);
-         skippedCharacters.push(char.name);
-         continue;
-       }
-       
-       // Download and convert to base64
-       console.log(`Downloading reference image for "${char.name}": ${char.primary_image_url}`);
-       const imageData = await downloadImage(char.primary_image_url, `${char.name.replace(/\s+/g, '_')}.png`);
-       
-       if (imageData) {
-         referenceImages.push(imageData);
-         includedCharacters.push(char.name);
-         
-         if (isEnvironment) {
-           includedAsEnvironment.push(char.name);
-           console.log(`Added reference image for "${char.name}" (ENVIRONMENT - always included)`);
-         } else {
-           includedAsCharacterMatch.push(char.name);
-           console.log(`Added reference image for "${char.name}" (character match)`);
-         }
-       } else {
-         console.log(`Failed to download reference image for "${char.name}" - skipping`);
-         skippedCharacters.push(char.name);
-       }
-     }
-     
-     // Also check if any names in characters_in_scene didn't match any character record
-     for (const charName of charactersInScene) {
-       const matchedChar = charList.find(
-         (c) => c.name.toLowerCase() === charName.toLowerCase()
-       );
-       if (!matchedChar) {
-         console.log(`Character "${charName}" from scene not found in character records - skipping`);
-         if (!skippedCharacters.includes(charName)) {
-           skippedCharacters.push(charName);
-         }
-       }
-     }
+      // Determine which characters to include:
+      // 1. Environment characters ALWAYS get included
+      // 2. Regular characters if they appear in characters_in_scene OR are mentioned in the image_prompt (case-insensitive)
+      const charactersInScene = (scene.characters_in_scene || []) as string[];
+      const promptLowerForCharScan = scene.image_prompt.toLowerCase();
+      const referenceImages: DownloadedImage[] = [];
+      const includedCharacters: string[] = [];
+      const skippedCharacters: string[] = [];
+      const includedAsEnvironment: string[] = [];
+      const includedAsCharacterMatch: string[] = [];
+      
+      // Process all characters
+      for (const char of charList) {
+        const isEnvironment = char.character_type === "environment";
+        const isInScene = charactersInScene.some(
+          (name) => name.toLowerCase() === char.name.toLowerCase()
+        );
+        // Also check if the character name appears in the image prompt text
+        const isInPrompt = promptLowerForCharScan.includes(char.name.toLowerCase());
+        
+        const shouldInclude = isEnvironment || isInScene || isInPrompt;
+        
+        if (!shouldInclude) {
+          console.log(`Character "${char.name}" is not in scene, not in prompt, and not environment - skipping`);
+          continue;
+        }
+        
+        if (!char.primary_image_url) {
+          console.log(`Character "${char.name}" has no reference image - skipping`);
+          skippedCharacters.push(char.name);
+          continue;
+        }
+        
+        // Download and convert to base64
+        console.log(`Downloading reference image for "${char.name}": ${char.primary_image_url}`);
+        const imageData = await downloadImage(char.primary_image_url, `${char.name.replace(/\s+/g, '_')}.png`);
+        
+        if (imageData) {
+          referenceImages.push(imageData);
+          includedCharacters.push(char.name);
+          
+          if (isEnvironment) {
+            includedAsEnvironment.push(char.name);
+            console.log(`Added reference image for "${char.name}" (ENVIRONMENT - always included)`);
+          } else if (isInPrompt && !isInScene) {
+            includedAsCharacterMatch.push(char.name);
+            console.log(`Added reference image for "${char.name}" (found in prompt text)`);
+          } else {
+            includedAsCharacterMatch.push(char.name);
+            console.log(`Added reference image for "${char.name}" (character match)`);
+          }
+        } else {
+          console.log(`Failed to download reference image for "${char.name}" - skipping`);
+          skippedCharacters.push(char.name);
+        }
+      }
+      
+      // Also check if any names in characters_in_scene didn't match any character record
+      for (const charName of charactersInScene) {
+        const matchedChar = charList.find(
+          (c) => c.name.toLowerCase() === charName.toLowerCase()
+        );
+        if (!matchedChar) {
+          console.log(`Character "${charName}" from scene not found in character records - skipping`);
+          if (!skippedCharacters.includes(charName)) {
+            skippedCharacters.push(charName);
+          }
+        }
+      }
      
      console.log(`Reference images to send: ${referenceImages.length}`);
      console.log(`Included characters: ${includedCharacters.join(", ") || "none"}`);

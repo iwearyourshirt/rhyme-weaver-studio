@@ -25,6 +25,7 @@ interface SceneCardProps {
   onGenerate: () => void;
   onApprovalChange: (approved: boolean) => void;
   onPromptSave: (updates: { image_prompt?: string; shot_type?: ShotType }) => Promise<void>;
+  onCharactersUpdate?: (newPrompt: string) => void;
 }
 
 function formatTime(seconds: number): string {
@@ -42,6 +43,7 @@ export function SceneCard({
   onGenerate,
   onApprovalChange,
   onPromptSave,
+  onCharactersUpdate,
 }: SceneCardProps) {
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [editedPrompt, setEditedPrompt] = useState(scene.image_prompt);
@@ -87,10 +89,12 @@ export function SceneCard({
     }
   };
 
-  const handlePromptRewritten = (newPrompt: string) => {
+  const handlePromptRewritten = async (newPrompt: string) => {
     setEditedPrompt(newPrompt);
     // Auto-save to DB so it survives page refresh
-    onPromptSave({ image_prompt: newPrompt });
+    await onPromptSave({ image_prompt: newPrompt });
+    // characters_in_scene is updated at the page level via onCharactersUpdate
+    onCharactersUpdate?.(newPrompt);
   };
 
   const progressPercent = Math.min((elapsedTime / ESTIMATED_GENERATION_TIME) * 100, 95);
