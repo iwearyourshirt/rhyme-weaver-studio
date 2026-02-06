@@ -14,12 +14,13 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
    text: string;
  }
  
- interface Character {
-   id: string;
-   name: string;
-   description: string;
-   primary_image_url: string | null;
- }
+  interface Character {
+    id: string;
+    name: string;
+    description: string;
+    primary_image_url: string | null;
+    character_type: string | null;
+  }
  
 interface GeneratedScene {
   scene_number: number;
@@ -186,7 +187,7 @@ async function logAICost(
       // Fetch characters
       const { data: characters, error: charsError } = await supabase
         .from("characters")
-        .select("id, name, description, primary_image_url")
+        .select("id, name, description, primary_image_url, character_type")
         .eq("project_id", project_id);
 
       if (charsError) {
@@ -196,13 +197,15 @@ async function logAICost(
       const charList = (characters || []) as Character[];
       console.log(`Found ${charList.length} characters`);
 
-      // Build the user message
-      let userMessage = "Here are the characters in this video:\n\n";
+      // Build the user message - separate characters from environments
+      const characterEntries = charList.filter(c => c.character_type !== 'environment');
+      const environmentEntries = charList.filter(c => c.character_type === 'environment');
       
-      if (charList.length === 0) {
-        userMessage += "(No characters defined yet)\n\n";
-      } else {
-        for (const char of charList) {
+      let userMessage = "";
+      
+      if (characterEntries.length > 0) {
+        userMessage += "Here are the characters in this video:\n\n";
+        for (const char of characterEntries) {
           userMessage += `- ${char.name}: ${char.description}`;
           if (char.primary_image_url) {
             userMessage += " (reference images exist)";
@@ -210,6 +213,20 @@ async function logAICost(
           userMessage += "\n";
         }
         userMessage += "\n";
+      } else {
+        userMessage += "Characters: (No characters defined yet)\n\n";
+      }
+      
+      if (environmentEntries.length > 0) {
+        userMessage += "Here are the environments/settings available for scenes:\n\n";
+        for (const env of environmentEntries) {
+          userMessage += `- ${env.name}: ${env.description}`;
+          if (env.primary_image_url) {
+            userMessage += " (reference images exist)";
+          }
+          userMessage += "\n";
+        }
+        userMessage += "\nUse these environments as backdrops and settings for the scenes. They should NOT appear in the characters_in_scene array — they are places, not characters.\n\n";
       }
 
       userMessage += "Here are the lyrics with timestamps:\n\n";
