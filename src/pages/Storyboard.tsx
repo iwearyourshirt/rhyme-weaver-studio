@@ -609,8 +609,13 @@ export default function Storyboard() {
                             currentPrompt={getEditedValue(scene, 'image_prompt')}
                             sceneDescription={scene.scene_description}
                             promptType="image"
-                            shotType={scene.shot_type}
-                            onRewrite={(newPrompt) => handleLocalEdit(scene.id, 'image_prompt', newPrompt)}
+                            shotType={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
+                            onRewrite={(newPrompt) => {
+                              handleLocalEdit(scene.id, 'image_prompt', newPrompt);
+                              if (projectId) {
+                                updateScene.mutateAsync({ id: scene.id, projectId, updates: { image_prompt: newPrompt } });
+                              }
+                            }}
                           />
                         </div>
                         <div className="space-y-1.5">
@@ -624,8 +629,13 @@ export default function Storyboard() {
                             currentPrompt={getEditedValue(scene, 'animation_prompt')}
                             sceneDescription={scene.scene_description}
                             promptType="animation"
-                            shotType={scene.shot_type}
-                            onRewrite={(newPrompt) => handleLocalEdit(scene.id, 'animation_prompt', newPrompt)}
+                            shotType={sceneEdits[scene.id]?.shot_type ?? scene.shot_type}
+                            onRewrite={(newPrompt) => {
+                              handleLocalEdit(scene.id, 'animation_prompt', newPrompt);
+                              if (projectId) {
+                                updateScene.mutateAsync({ id: scene.id, projectId, updates: { animation_prompt: newPrompt } });
+                              }
+                            }}
                           />
                         </div>
                       </CollapsibleContent>

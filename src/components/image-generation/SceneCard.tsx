@@ -89,6 +89,8 @@ export function SceneCard({
 
   const handlePromptRewritten = (newPrompt: string) => {
     setEditedPrompt(newPrompt);
+    // Auto-save to DB so it survives page refresh
+    onPromptSave({ image_prompt: newPrompt });
   };
 
   const progressPercent = Math.min((elapsedTime / ESTIMATED_GENERATION_TIME) * 100, 95);
