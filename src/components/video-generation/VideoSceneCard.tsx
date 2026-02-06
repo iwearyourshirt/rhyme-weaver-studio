@@ -37,10 +37,10 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// LTX Video 2.0 Fast timing: typically 10-30 seconds
-// We use a base estimate of 20s with adaptive adjustment
-const BASE_GENERATION_TIME = 20;
-const MAX_GENERATION_TIME = 45; // Cap for edge cases
+// LTX Video 2.0 Fast: generation is fast but fal.ai queue wait adds time
+// Typical total: 1-3 minutes including queue wait
+const BASE_GENERATION_TIME = 90;
+const MAX_GENERATION_TIME = 180;
 
 export function VideoSceneCard({
   scene,
