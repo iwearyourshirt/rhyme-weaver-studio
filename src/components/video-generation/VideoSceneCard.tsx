@@ -280,6 +280,7 @@ export function VideoSceneCard({
                 currentPrompt={editedPrompt}
                 sceneDescription={scene.scene_description}
                 promptType="animation"
+                shotType={scene.shot_type}
                 onRewrite={handlePromptRewritten}
               />
             </CollapsibleContent>

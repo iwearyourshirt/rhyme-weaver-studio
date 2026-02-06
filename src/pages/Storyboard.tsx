@@ -609,6 +609,7 @@ export default function Storyboard() {
                             currentPrompt={getEditedValue(scene, 'image_prompt')}
                             sceneDescription={scene.scene_description}
                             promptType="image"
+                            shotType={scene.shot_type}
                             onRewrite={(newPrompt) => handleLocalEdit(scene.id, 'image_prompt', newPrompt)}
                           />
                         </div>
@@ -623,6 +624,7 @@ export default function Storyboard() {
                             currentPrompt={getEditedValue(scene, 'animation_prompt')}
                             sceneDescription={scene.scene_description}
                             promptType="animation"
+                            shotType={scene.shot_type}
                             onRewrite={(newPrompt) => handleLocalEdit(scene.id, 'animation_prompt', newPrompt)}
                           />
                         </div>

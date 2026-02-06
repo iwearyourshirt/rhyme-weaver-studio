@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
  
    try {
-     const { prompt_type, current_prompt, scene_description, feedback } = await req.json();
+     const { prompt_type, current_prompt, scene_description, shot_type, feedback } = await req.json();
  
       if (!prompt_type || !feedback) {
         return new Response(
@@ -24,16 +24,30 @@ Deno.serve(async (req) => {
      if (!lovableApiKey) {
        throw new Error("LOVABLE_API_KEY not configured");
      }
+
+     // Map shot_type value to human-readable label
+     const shotTypeLabels: Record<string, string> = {
+       "wide": "Wide Shot",
+       "medium": "Medium Shot",
+       "close-up": "Close-Up",
+       "extreme-close-up": "Extreme Close-Up",
+       "two-shot": "Two-Shot",
+       "over-shoulder": "Over-the-Shoulder",
+     };
+     const shotLabel = shot_type ? (shotTypeLabels[shot_type] || shot_type) : null;
  
     const systemPrompt = `You are an expert prompt engineer for AI image and video generation. Your task is to rewrite prompts based on user feedback while maintaining the core scene intent.
 
-ABSOLUTE CHARACTER RULES (MUST FOLLOW):
-1. First, identify ALL character names in the CURRENT PROMPT (names like Webster, Avery, etc.)
-2. ONLY those exact characters may appear in your rewritten prompt
-3. NEVER add any character from the scene_description that is NOT already in the current_prompt
-4. NEVER introduce new characters unless the user's feedback EXPLICITLY says "add [character name]"
-5. If a character appears in scene_description but NOT in current_prompt, DO NOT include them
-6. If unsure, include FEWER characters, not more
+CHARACTER RULES:
+1. Characters mentioned in the CURRENT PROMPT must be preserved in the rewrite
+2. Characters mentioned in the USER FEEDBACK must be ADDED to the rewrite — the user is explicitly requesting them
+3. NEVER add characters from the scene_description UNLESS they appear in the current prompt or the user's feedback
+4. If unsure, keep existing characters and add any the user mentions
+
+SHOT TYPE RULES:
+${shotLabel ? `- The selected shot type is "${shotLabel}". You MUST frame the prompt for this shot type.
+- NEVER use a different shot type framing (e.g., do NOT say "Wide shot" if the shot type is "Close-Up").
+- End the prompt with "${shotLabel} framing." to reinforce the composition.` : '- No specific shot type is set. Use whatever framing fits the scene.'}
 
 GUIDELINES:
 - Keep the same overall scene structure
@@ -47,22 +61,24 @@ GUIDELINES:
       
       const userMessage = hasCurrentPrompt
         ? `Prompt Type: ${prompt_type === 'image' ? 'Image Generation' : 'Animation/Video'}
+${shotLabel ? `Selected Shot Type: ${shotLabel}` : ''}
 
-IMPORTANT: Only characters that appear in "Current Prompt" below may appear in your rewritten version. Do NOT add characters from the scene description.
+Characters in current prompt must stay. Characters mentioned in user feedback must be added.
  
-Scene Description (for context only, do NOT pull characters from here):
+Scene Description (for context only):
 ${scene_description}
  
-Current Prompt (ONLY these characters allowed):
+Current Prompt:
 ${current_prompt}
  
 User Feedback:
 ${feedback}
  
-Rewrite the prompt incorporating ONLY the feedback. Do not add any characters not in the current prompt:`
+Rewrite the prompt incorporating the feedback. Keep existing characters and add any the user mentions:`
         : `Prompt Type: ${prompt_type === 'image' ? 'Image Generation' : 'Animation/Video'}
+${shotLabel ? `Selected Shot Type: ${shotLabel}` : ''}
 
-There is no existing prompt yet. Write a NEW prompt from scratch based on the scene description and user feedback.
+Write a NEW prompt from scratch based on the scene description and user feedback.
 
 Scene Description:
 ${scene_description}

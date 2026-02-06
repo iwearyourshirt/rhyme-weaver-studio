@@ -9,10 +9,11 @@ import { toast } from 'sonner';
    promptType: 'image' | 'animation';
    currentPrompt: string;
    sceneDescription: string;
+   shotType?: string;
    onRewrite: (newPrompt: string) => void;
  }
  
- export function PromptFeedback({ promptType, currentPrompt, sceneDescription, onRewrite }: PromptFeedbackProps) {
+ export function PromptFeedback({ promptType, currentPrompt, sceneDescription, shotType, onRewrite }: PromptFeedbackProps) {
    const [feedback, setFeedback] = useState('');
    const [isRewriting, setIsRewriting] = useState(false);
  
@@ -29,6 +30,7 @@ import { toast } from 'sonner';
             prompt_type: promptType,
             current_prompt: currentPrompt,
             scene_description: sceneDescription,
+            shot_type: shotType || null,
             feedback: feedback.trim(),
           },
         });
