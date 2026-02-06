@@ -339,6 +339,7 @@ export default function VideoGeneration() {
       projectId: projectId!,
       updates: { animation_prompt: newPrompt },
     });
+    toast.success('Prompt saved');
   };
 
   const cancelVideoGeneration = async (sceneId: string) => {
