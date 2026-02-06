@@ -59,8 +59,8 @@ export default function Characters() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newCharName, setNewCharName] = useState('');
   const [newCharDesc, setNewCharDesc] = useState('');
-  const [generatingCharId, setGeneratingCharId] = useState<string | null>(null);
-  const [generatingAnglesCharId, setGeneratingAnglesCharId] = useState<string | null>(null);
+  const [generatingCharIds, setGeneratingCharIds] = useState<Set<string>>(new Set());
+  const [generatingAnglesCharIds, setGeneratingAnglesCharIds] = useState<Set<string>>(new Set());
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null);
   const [editingCharacter, setEditingCharacter] = useState<{ id: string; name: string; description: string } | null>(null);
   const [deletingImage, setDeletingImage] = useState<{ characterId: string; imageUrl: string } | null>(null);
@@ -95,7 +95,7 @@ export default function Characters() {
       return;
     }
 
-    setGeneratingCharId(characterId);
+    setGeneratingCharIds(prev => new Set(prev).add(characterId));
     
     try {
       const requestPayload = {
@@ -144,7 +144,7 @@ export default function Characters() {
       logApiCall('Generate Reference Images (Error)', { characterId }, { error: errorMessage });
       toast.error(errorMessage);
     } finally {
-      setGeneratingCharId(null);
+      setGeneratingCharIds(prev => { const next = new Set(prev); next.delete(characterId); return next; });
     }
   };
 
@@ -155,7 +155,7 @@ export default function Characters() {
       return;
     }
 
-    setGeneratingAnglesCharId(characterId);
+    setGeneratingAnglesCharIds(prev => new Set(prev).add(characterId));
     
     try {
       const requestPayload = {
@@ -208,7 +208,7 @@ export default function Characters() {
       logApiCall('Generate Consistent Angles (Error)', { characterId }, { error: errorMessage });
       toast.error(errorMessage);
     } finally {
-      setGeneratingAnglesCharId(null);
+      setGeneratingAnglesCharIds(prev => { const next = new Set(prev); next.delete(characterId); return next; });
     }
   };
 
@@ -542,14 +542,14 @@ export default function Characters() {
                             size="sm"
                             className="flex-1 h-9"
                             onClick={() => handleGenerateConsistentAngles(character.id)}
-                            disabled={generatingAnglesCharId === character.id}
+                            disabled={generatingAnglesCharIds.has(character.id)}
                           >
-                            {generatingAnglesCharId === character.id ? (
+                            {generatingAnglesCharIds.has(character.id) ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
                               <RotateCcw className="h-3.5 w-3.5" />
                             )}
-                            <span className="ml-1.5">{generatingAnglesCharId === character.id ? 'Generating...' : 'Angles'}</span>
+                            <span className="ml-1.5">{generatingAnglesCharIds.has(character.id) ? 'Generating...' : 'Angles'}</span>
                           </Button>
                         )}
                         <Button
@@ -557,14 +557,14 @@ export default function Characters() {
                           size="sm"
                           className="flex-1 h-9"
                           onClick={() => handleGenerateImages(character.id)}
-                          disabled={generatingCharId === character.id}
+                          disabled={generatingCharIds.has(character.id)}
                         >
-                          {generatingCharId === character.id ? (
+                          {generatingCharIds.has(character.id) ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <RefreshCw className="h-3.5 w-3.5" />
                           )}
-                          <span className="ml-1.5">{generatingCharId === character.id ? 'Generating...' : 'New Set'}</span>
+                          <span className="ml-1.5">{generatingCharIds.has(character.id) ? 'Generating...' : 'New Set'}</span>
                         </Button>
                       </div>
                     </>
@@ -573,14 +573,14 @@ export default function Characters() {
                       variant="outline"
                       className="w-full h-9"
                       onClick={() => handleGenerateImages(character.id)}
-                      disabled={generatingCharId === character.id}
+                      disabled={generatingCharIds.has(character.id)}
                     >
-                      {generatingCharId === character.id ? (
+                      {generatingCharIds.has(character.id) ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Wand2 className="h-4 w-4" />
                       )}
-                      <span className="ml-2">{generatingCharId === character.id ? 'Generating...' : 'Generate Reference Images'}</span>
+                      <span className="ml-2">{generatingCharIds.has(character.id) ? 'Generating...' : 'Generate Reference Images'}</span>
                     </Button>
                   )}
                 </div>
