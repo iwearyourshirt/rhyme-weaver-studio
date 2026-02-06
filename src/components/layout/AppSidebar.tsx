@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import {
   Collapsible,
@@ -41,11 +42,20 @@ function getProjectIdFromPath(pathname: string): string | null {
 
 export function AppSidebar() {
   const location = useLocation();
+  const { setOpenMobile, setOpen, isMobile } = useSidebar();
   const projectId = getProjectIdFromPath(location.pathname);
   const { data: project } = useProject(projectId);
   
   // Keep project section open when viewing a project
   const isInProject = !!projectId;
+
+  const closeSidebar = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    } else {
+      setOpen(false);
+    }
+  };
 
   return (
     <Sidebar variant="overlay" className="border-r border-sidebar-border">
@@ -73,6 +83,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
+                      onClick={closeSidebar}
                       className={({ isActive }) =>
                         cn(
                           'flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground transition-colors',
@@ -114,6 +125,7 @@ export function AppSidebar() {
                         <SidebarMenuButton asChild>
                           <NavLink
                             to={`/project/${projectId}/${item.url}`}
+                            onClick={closeSidebar}
                             className={({ isActive }) =>
                               cn(
                                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground transition-colors',
