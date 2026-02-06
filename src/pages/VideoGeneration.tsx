@@ -169,6 +169,9 @@ export default function VideoGeneration() {
   const generateVideo = async (sceneId: string) => {
     const scene = scenes?.find((s) => s.id === sceneId);
     if (!scene || !scene.image_url) return;
+    
+    // Prevent duplicate generation if already in progress
+    if (scene.video_status === 'generating') return;
 
     const generationStartTime = Date.now();
     generationStartTimesRef.current.set(sceneId, generationStartTime);
