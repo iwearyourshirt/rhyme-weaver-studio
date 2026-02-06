@@ -1,95 +1,120 @@
 
 
-# Tighten Character and Environment References in Storyboard Generation
+# Edge Function Audit and Fix Plan
 
-## The Problem
+## Summary of Issues Found
 
-Looking at the current storyboard data, the issues are clear:
+After reviewing all 9 edge functions, I found **2 systemic problems** causing repeated breakage, plus several smaller inconsistencies.
 
-- Scenes 3, 4, 5, 7, 8, 10 all have **empty** `characters_in_scene` arrays despite clearly featuring Webster
-- Image prompts say "a felted spider" or "the spider" instead of **"Webster"**
-- Environments like "The Garden" and "English Cottage" are never referenced by name -- prompts say "felted wool landscape" instead
-- Lavender (Webster's wife) never appears despite being a defined character
+---
 
-The root cause is in the system prompt instructions sent to GPT-4o. The current instructions tell the AI to write "a complete image generation prompt that combines the project's visual style with the scene description and character descriptions" -- this encourages the AI to re-describe characters generically rather than use their actual names.
+## Problem 1: CORS Headers Are Inconsistent (Root Cause of Most Failures)
 
-## The Fix
+Two functions use **incomplete CORS headers**, which causes the browser to block requests silently and show "Failed to fetch" errors:
 
-Update the `generate-storyboard` edge function's prompt instructions to enforce strict character and environment naming rules.
+| Function | CORS Headers | Status |
+|---|---|---|
+| transcribe-audio | Full headers | OK |
+| generate-character-images | Full headers | OK |
+| generate-consistent-angles | Full headers | OK |
+| generate-storyboard | Full headers | OK |
+| generate-scene-image | Full headers | OK |
+| rewrite-prompt | Full headers | OK |
+| **generate-scene-video** | **Missing extended headers** | BROKEN |
+| **poll-video-status** | **Missing extended headers** | BROKEN |
+| **cancel-video-generation** | Full headers | OK |
 
-### Changes to `supabase/functions/generate-storyboard/index.ts`
-
-**1. Add explicit naming rules to the system message:**
-
-Add rules that tell GPT-4o:
-- Always use character names (e.g., "Webster", "Avery", "Lavender") -- never generic descriptions like "the spider" or "a young girl"
-- Always use environment names (e.g., "The Garden", "English Cottage") -- never generic descriptions like "a garden" or "a cottage"
-- Every scene MUST have a non-empty `characters_in_scene` array (at minimum the protagonist should appear in most scenes)
-- The image generation system has reference images for all characters and environments, so names are sufficient for visual consistency
-
-**2. Update the image_prompt instruction (line 246):**
-
-Change from:
-> "a complete image generation prompt that combines the project's visual style with the scene description and character descriptions"
-
-To something like:
-> "a concise image generation prompt. Reference characters and environments BY NAME (e.g., 'Webster climbs the spout' not 'a felted spider climbs'). The image system has reference images for all characters/environments, so names alone ensure visual consistency. Focus on composition, action, and framing."
-
-**3. Update the animation_prompt instruction similarly** to use character names, not generic descriptions.
-
-**4. Add a character/environment name reminder at the end of the user message:**
-
-After the lyrics section, add a block like:
+`generate-scene-video` and `poll-video-status` both use the short CORS header set:
 ```
-IMPORTANT - CHARACTER & ENVIRONMENT NAMING RULES:
-- Available characters: Webster, Avery, Lavender
-- Available environments: English Cottage, The Garden
-- ALWAYS use these exact names in scene_description, image_prompt, animation_prompt, and characters_in_scene
-- NEVER use generic descriptions like "the spider", "a girl", "a garden" -- use the character/environment name
-- Every scene should have at least one character in characters_in_scene
+"authorization, x-client-info, apikey, content-type"
 ```
 
-This dynamically lists all character and environment names so the AI has a clear reference.
+They are missing the `x-supabase-client-*` headers that the Supabase JS SDK sends automatically. This causes CORS preflight failures depending on browser/SDK version.
 
-## What Stays the Same
-
-- Cinematic shot type variety (wide, close-up, two-shot, etc.) -- no changes
-- Creative brief / style direction handling -- no changes
-- Scene structure (one per lyric line) -- no changes
-- The rest of the pipeline (image generation, video generation) -- no changes
-
-## File to Modify
-
-| File | Change |
-|------|--------|
-| `supabase/functions/generate-storyboard/index.ts` | Update system prompt and user message instructions to enforce character/environment naming |
-
-## Technical Details
-
-The key prompt changes:
-
-**System message addition:**
+### Fix
+Update both functions to use the full CORS header set:
 ```
-When writing scene descriptions and prompts, ALWAYS refer to characters and environments 
-by their exact names. Never use generic descriptions like "the spider" or "a garden" — 
-use "Webster" and "The Garden". The image generation pipeline uses reference images keyed 
-to these names, so using exact names is critical for visual consistency.
+"authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
 ```
 
-**User message -- replace image_prompt instruction:**
-```
-- image_prompt (a concise prompt for image generation. Reference all characters and 
-  environments BY THEIR EXACT NAMES — never generic descriptions. The image system has 
-  reference images for each character/environment, so names ensure consistency. Focus on 
-  action, composition, shot framing, and mood.)
-```
+---
 
-**User message -- dynamic name reminder appended after instructions:**
-```
-CRITICAL NAMING RULES:
-- Character names to use: [Webster, Avery, Lavender]
-- Environment names to use: [English Cottage, The Garden]  
-- ALWAYS use these exact names in ALL fields. Never say "the spider" — say "Webster".
-- characters_in_scene must list every character visible in that scene.
-```
+## Problem 2: Functions Not Deployed After Code Changes
+
+Every time code is edited, edge functions must be explicitly redeployed. This has caused repeated "Failed to fetch" errors across sessions. The fix is to **redeploy all 9 functions** as a batch after making the CORS fixes.
+
+---
+
+## Problem 3: Duplicated Cost Logging Helper
+
+The `logAICost` helper function is copy-pasted identically across 4 functions (generate-scene-image, generate-storyboard, generate-character-images, poll-video-status). While not a runtime bug, it means any cost-tracking fix must be applied in 4 places. This is acceptable for edge functions (no shared imports), but worth noting for maintenance.
+
+---
+
+## Per-Function Status and Fixes
+
+### 1. `transcribe-audio`
+- **CORS**: OK (full headers)
+- **API**: fal.ai Whisper -- OK
+- **Error handling**: OK
+- **Fix needed**: None
+
+### 2. `generate-character-images`
+- **CORS**: OK
+- **API**: OpenAI gpt-image-1 -- OK
+- **Cost logging**: OK
+- **Fix needed**: None
+
+### 3. `generate-consistent-angles`
+- **CORS**: OK
+- **API**: OpenAI gpt-image-1 edits -- OK
+- **Cost logging**: Missing (no cost logged for angle generation)
+- **Fix needed**: Add cost logging (same as character images: $0.04 per image x 3 angles = $0.12)
+
+### 4. `generate-storyboard`
+- **CORS**: OK
+- **API**: OpenAI GPT-4o -- OK
+- **Cost logging**: OK (token-based)
+- **Fix needed**: None
+
+### 5. `generate-scene-image`
+- **CORS**: OK
+- **API**: OpenAI gpt-image-1 -- OK
+- **Background processing**: Uses EdgeRuntime.waitUntil -- OK
+- **Cost logging**: OK
+- **Fix needed**: None
+
+### 6. `rewrite-prompt`
+- **CORS**: OK
+- **API**: Lovable AI Gateway (Gemini) -- OK
+- **Cost logging**: Missing (no cost logged, but Lovable gateway calls are free)
+- **Fix needed**: None
+
+### 7. `generate-scene-video` -- NEEDS FIX
+- **CORS**: BROKEN (short headers)
+- **API**: fal.ai LTX Video -- OK
+- **Cost logging**: Not here (done in poll-video-status) -- OK
+- **Fix needed**: Update CORS headers to full set
+
+### 8. `poll-video-status` -- NEEDS FIX
+- **CORS**: BROKEN (short headers)
+- **API**: fal.ai queue status -- OK
+- **Cost logging**: OK
+- **Fix needed**: Update CORS headers to full set
+
+### 9. `cancel-video-generation`
+- **CORS**: OK
+- **API**: fal.ai queue cancel -- OK
+- **Fix needed**: None
+
+---
+
+## Implementation Steps
+
+1. **Fix `generate-scene-video/index.ts`**: Replace the short CORS headers with the full set
+2. **Fix `poll-video-status/index.ts`**: Replace the short CORS headers with the full set
+3. **Fix `generate-consistent-angles/index.ts`**: Add cost logging ($0.04 x 3 = $0.12 per call)
+4. **Deploy ALL 9 functions in a single batch** to ensure nothing is left undeployed
+
+These are small, surgical changes -- just the CORS header strings on 2 files, cost logging on 1 file, and a full redeploy.
 
