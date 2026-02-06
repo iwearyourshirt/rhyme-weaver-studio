@@ -13,12 +13,12 @@ Deno.serve(async (req) => {
    try {
      const { prompt_type, current_prompt, scene_description, feedback } = await req.json();
  
-     if (!prompt_type || !current_prompt || !feedback) {
-       return new Response(
-         JSON.stringify({ error: "Missing required fields" }),
-         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-       );
-     }
+      if (!prompt_type || !feedback) {
+        return new Response(
+          JSON.stringify({ error: "Missing required fields: prompt_type and feedback are required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
  
      const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
      if (!lovableApiKey) {
@@ -43,7 +43,10 @@ GUIDELINES:
 - Be concise but descriptive
 - Output ONLY the rewritten prompt, no explanations or preamble`;
  
-     const userMessage = `Prompt Type: ${prompt_type === 'image' ? 'Image Generation' : 'Animation/Video'}
+      const hasCurrentPrompt = current_prompt && current_prompt.trim();
+      
+      const userMessage = hasCurrentPrompt
+        ? `Prompt Type: ${prompt_type === 'image' ? 'Image Generation' : 'Animation/Video'}
 
 IMPORTANT: Only characters that appear in "Current Prompt" below may appear in your rewritten version. Do NOT add characters from the scene description.
  
@@ -56,7 +59,18 @@ ${current_prompt}
 User Feedback:
 ${feedback}
  
-Rewrite the prompt incorporating ONLY the feedback. Do not add any characters not in the current prompt:`;
+Rewrite the prompt incorporating ONLY the feedback. Do not add any characters not in the current prompt:`
+        : `Prompt Type: ${prompt_type === 'image' ? 'Image Generation' : 'Animation/Video'}
+
+There is no existing prompt yet. Write a NEW prompt from scratch based on the scene description and user feedback.
+
+Scene Description:
+${scene_description}
+
+User Feedback / Instructions:
+${feedback}
+
+Write a complete ${prompt_type === 'image' ? 'image generation' : 'animation/video'} prompt based on the scene description and feedback above:`;
  
      console.log(`Rewriting ${prompt_type} prompt with feedback: ${feedback}`);
  
