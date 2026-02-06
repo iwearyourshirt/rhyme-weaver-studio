@@ -6,11 +6,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
  
-const FELTED_STYLE_PREFIX = `Professional needle-felted wool character for a stop-motion animated children's show. High-quality handcrafted felted wool figure with visible wool fiber texture. Photographed with a macro lens, shallow depth of field, warm golden-hour natural light, soft green bokeh background. Always show the full character from top to bottom, never cropped.`;
+const CHARACTER_STYLE_PREFIX = `Professional needle-felted wool character for a stop-motion animated children's show. High-quality handcrafted felted wool figure with visible wool fiber texture. Photographed with a macro lens, shallow depth of field, warm golden-hour natural light, soft green bokeh background. Always show the full character from top to bottom, never cropped.`;
+
+const ENVIRONMENT_STYLE_PREFIX = `Professional needle-felted wool environment/setting for a stop-motion animated children's show. This is a PLACE or LOCATION, not a character or creature. High-quality handcrafted felted wool landscape, set piece, or backdrop with visible wool fiber texture throughout. Photographed with a macro lens, warm golden-hour natural light. Show the full environment as a wide establishing shot. No characters, figures, or creatures should appear in this image — only the setting itself.`;
  
-const POSE_SUFFIXES = [
+const CHARACTER_POSE_SUFFIXES = [
   "Front view of the character, entire figure visible on felted wool grass.",
   "The character shown from a slightly elevated angle, soft blurred background.",
+];
+
+const ENVIRONMENT_POSE_SUFFIXES = [
+  "Wide establishing shot of the entire environment, showing the full setting.",
+  "Slightly elevated three-quarter angle view of the environment, showing depth and detail.",
 ];
  
 interface OpenAIImageResponse {
@@ -105,7 +112,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { character_name, character_description, project_id, character_id } = await req.json();
+    const { character_name, character_description, project_id, character_id, character_type } = await req.json();
      
     if (!character_name || !character_description) {
       throw new Error("character_name and character_description are required");
@@ -120,15 +127,21 @@ Deno.serve(async (req) => {
     // Generate timestamp for cache-busting
     const timestamp = Date.now();
  
-    const basePrompt = `${FELTED_STYLE_PREFIX}\n\nThis character is ${character_name}, ${character_description}`;
+    const isEnvironment = character_type === 'environment';
+    const stylePrefix = isEnvironment ? ENVIRONMENT_STYLE_PREFIX : CHARACTER_STYLE_PREFIX;
+    const basePrompt = isEnvironment
+      ? `${stylePrefix}\n\nThis environment is called "${character_name}": ${character_description}`
+      : `${stylePrefix}\n\nThis character is ${character_name}, ${character_description}`;
  
     // Generate images in parallel
     const generatedPrompts: string[] = [];
     
-    const imagePromises = POSE_SUFFIXES.map(async (suffix, index) => {
+    const poseSuffixes = isEnvironment ? ENVIRONMENT_POSE_SUFFIXES : CHARACTER_POSE_SUFFIXES;
+    
+    const imagePromises = poseSuffixes.map(async (suffix, index) => {
       const fullPrompt = `${basePrompt}\n\n${suffix}`;
        
-      console.log(`Generating image ${index + 1}/${POSE_SUFFIXES.length}...`);
+      console.log(`Generating image ${index + 1}/${poseSuffixes.length}...`);
       console.log(`Full prompt: ${fullPrompt}`);
       generatedPrompts.push(fullPrompt);
        
@@ -154,7 +167,7 @@ Deno.serve(async (req) => {
       }
  
       const data: OpenAIImageResponse = await response.json();
-      console.log(`Image ${index + 1}/${POSE_SUFFIXES.length} generated successfully`);
+      console.log(`Image ${index + 1}/${poseSuffixes.length} generated successfully`);
        
       const b64Data = data.data[0]?.b64_json;
       if (!b64Data) {

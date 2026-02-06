@@ -103,6 +103,7 @@ export default function Characters() {
         character_description: character.description,
         project_id: projectId,
         character_id: character.id,
+        character_type: character.character_type,
       };
       
       console.log('Calling generate-character-images edge function...');
