@@ -155,6 +155,17 @@ export default function VideoGeneration() {
     };
   }, [scenes, pollVideoStatus]);
 
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  const isNetworkishInvokeError = (message: string | undefined) => {
+    const m = (message || '').toLowerCase();
+    return (
+      m.includes('failed to send a request') ||
+      m.includes('failed to fetch') ||
+      m.includes('networkerror')
+    );
+  };
+
   const generateVideo = async (sceneId: string) => {
     const scene = scenes?.find((s) => s.id === sceneId);
     if (!scene || !scene.image_url) return;
@@ -185,6 +196,26 @@ export default function VideoGeneration() {
       });
 
       if (response.error) {
+        console.error('Edge function error:', response.error);
+
+        // Even on network error, the edge function may have started.
+        // Wait briefly and check if status moved to "generating".
+        if (isNetworkishInvokeError(response.error.message)) {
+          await sleep(2000);
+          try {
+            const { data: statusRow } = await supabase
+              .from('scenes')
+              .select('video_status')
+              .eq('id', sceneId)
+              .single();
+            if (statusRow?.video_status === 'generating' || statusRow?.video_status === 'done') {
+              // Edge function started successfully despite network error — polling will handle the rest
+              console.log(`Scene ${sceneId} is already generating despite network error`);
+              return;
+            }
+          } catch { /* ignore */ }
+        }
+
         throw new Error(response.error.message);
       }
 
