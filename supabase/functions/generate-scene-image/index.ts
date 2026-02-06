@@ -184,25 +184,22 @@ function getShotTypeInstruction(shotType: string): string {
          const charList = (characters || []) as Character[];
          console.log(`[BG] Found ${charList.length} characters in project`);
          
-         // Determine which characters to include
-          const charactersInScene = (scene.characters_in_scene || []) as string[];
-          const promptLowerForCharScan = scene.image_prompt.toLowerCase();
-          const referenceImages: DownloadedImage[] = [];
-          const includedCharacters: string[] = [];
-          
-          // Track whether any actual characters (non-environment) are included
-          let hasNonEnvironmentReference = false;
-          
-          for (const char of charList) {
-            const isEnvironment = char.character_type === "environment";
-            const isInScene = charactersInScene.some(
-              (name) => name.toLowerCase() === char.name.toLowerCase()
-            );
-            const isInPrompt = promptLowerForCharScan.includes(char.name.toLowerCase());
-            
-            // Only include if explicitly in characters_in_scene list OR mentioned by name in the prompt
-            if (!(isInScene || isInPrompt)) continue;
-            if (!char.primary_image_url) continue;
+          // Determine which characters to include based on PROMPT TEXT only
+           // characters_in_scene can be stale — the prompt is the source of truth for reference images
+           const promptLowerForCharScan = scene.image_prompt.toLowerCase();
+           const referenceImages: DownloadedImage[] = [];
+           const includedCharacters: string[] = [];
+           
+           // Track whether any actual characters (non-environment) are included
+           let hasNonEnvironmentReference = false;
+           
+           for (const char of charList) {
+             const isEnvironment = char.character_type === "environment";
+             const isInPrompt = promptLowerForCharScan.includes(char.name.toLowerCase());
+             
+             // Only include reference image if the character/environment is mentioned by name in the prompt
+             if (!isInPrompt) continue;
+             if (!char.primary_image_url) continue;
             
             if (!isEnvironment) {
               hasNonEnvironmentReference = true;
