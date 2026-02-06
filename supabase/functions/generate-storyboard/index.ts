@@ -6,11 +6,19 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
  };
  
- const DEFAULT_SYSTEM_MESSAGE = `You are a storyboard director for a stop-motion animated children's show. You create vivid, detailed scene descriptions that will be used to generate images and animate them into video clips.
+const DEFAULT_SYSTEM_MESSAGE = `You are a storyboard director for a stop-motion animated children's show. You create vivid, detailed scene descriptions that will be used to generate images and animate them into video clips.
 
 When writing scene descriptions and prompts, ALWAYS refer to characters and environments by their exact names. Never use generic descriptions like "the spider" or "a garden" — use the character's name (e.g., "Webster") and the environment's name (e.g., "The Garden"). The image generation pipeline uses reference images keyed to these exact names, so using them is critical for visual consistency.
 
-Every scene MUST have a non-empty characters_in_scene array listing every character visible in that scene. The protagonist should appear in most scenes.`;
+Every scene MUST have a non-empty characters_in_scene array listing every character visible in that scene. The protagonist should appear in most scenes.
+
+HANDLING REPEATED LYRICS (CHORUS/REFRAIN):
+Songs often repeat lyrics — especially in a chorus. Even when the lyrics are identical, each scene MUST be visually unique. Never duplicate or closely repeat a scene description or image prompt from an earlier occurrence of the same lyric. Instead:
+- Advance the story: show a different moment, reaction, or consequence each time the chorus returns.
+- Change the setting or environment: move the camera to a new location or angle.
+- Shift the shot type: if the first chorus was a wide shot, use close-ups or two-shots for the next.
+- Evolve emotion or stakes: each repetition should feel like the story has progressed.
+Think of repeated lyrics as chapter markers — same words, but the visual story moves forward each time.`;
  
  interface TimestampEntry {
    start: number;
@@ -181,11 +189,19 @@ async function logAICost(
       const styleDirection = project.style_direction || "professional animation";
       const creativeBrief = project.creative_brief || "";
       
+      const animationDirection = project.animation_direction || "";
+      const cinematographyDirection = project.cinematography_direction || "";
+      
       let systemMessage = DEFAULT_SYSTEM_MESSAGE;
       if (creativeBrief) {
-        systemMessage += ` The visual style for this project is: ${creativeBrief}. Use this to inform scene descriptions, camera angles, and visual details. Do not repeat the style description in every scene — assume it as the default.`;
+        systemMessage += `\n\nThe visual style for this project is: ${creativeBrief}. Use this to inform scene descriptions, camera angles, and visual details. Do not repeat the style description in every scene — assume it as the default.`;
       } else {
-        systemMessage += ` The visual style is: ${styleDirection}.`;
+        systemMessage += `\n\nThe visual style is: ${styleDirection}.`;
+      }
+      
+      // Enforce the project's creative tone in all scenes
+      if (animationDirection) {
+        systemMessage += `\n\nIMPORTANT — ANIMATION & MOTION TONE: The director has specified the motion feel as "${animationDirection}". ALL scene descriptions, image prompts, and animation prompts MUST respect this tone. Do NOT introduce energy, excitement, speed, or intensity that contradicts this direction. If the feel is "slow and dreamy", scenes should never feel "energetic" or "excited". Match the emotional register of every scene to this direction.`;
       }
 
       // Fetch characters
@@ -250,7 +266,10 @@ async function logAICost(
 - image_prompt (a concise image generation prompt. Reference all characters and environments BY THEIR EXACT NAMES — never generic descriptions like "a spider" or "a garden". The image system has reference images for each character/environment, so names alone ensure visual consistency. Focus on action, composition, shot framing, and mood. Include the shot type framing.)
 - animation_prompt (a short description of how this scene should be animated. Reference characters BY NAME — never generic descriptions. Describe what moves, camera motion, and character actions. Keep it to 1-2 sentences focused on the key motion.)
 
-Return the result as a JSON object with a single key "scenes" containing an array of scene objects.`;
+Return the result as a JSON object with a single key "scenes" containing an array of scene objects.
+
+IMPORTANT — REPEATED LYRICS:
+Some lyrics above may repeat (chorus, refrain). Even when lyrics are identical, each scene MUST be visually distinct. Never reuse the same scene description or image prompt. Advance the story, change environments, shift camera angles, or evolve the emotional stakes with each repetition.`;
 
       // Append dynamic naming rules with actual character/environment names
       const characterNames = characterEntries.map(c => c.name);
@@ -267,6 +286,17 @@ Return the result as a JSON object with a single key "scenes" containing an arra
         userMessage += `\n- ALWAYS use these exact names in scene_description, image_prompt, animation_prompt, and characters_in_scene.`;
         userMessage += `\n- NEVER use generic descriptions like "the spider", "a girl", "a garden" — always use the character/environment name.`;
         userMessage += `\n- characters_in_scene must list every character visible in that scene (NOT environments).`;
+      }
+      
+      // Reinforce creative direction tone at the end of user message
+      if (animationDirection || styleDirection) {
+        userMessage += `\n\nCREATIVE DIRECTION REMINDER:`;
+        if (animationDirection) {
+          userMessage += `\n- Motion/animation feel: "${animationDirection}" — match this tone in ALL animation_prompt and scene_description fields. Do NOT contradict it.`;
+        }
+        if (styleDirection) {
+          userMessage += `\n- Visual style: "${styleDirection}" — do not describe conflicting aesthetics.`;
+        }
       }
  
       console.log("Calling OpenAI API...");
