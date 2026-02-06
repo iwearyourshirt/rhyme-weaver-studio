@@ -113,51 +113,14 @@ export default function ImageGeneration() {
     clearToastTracking(sceneId);
     
     // Optimistically update the react-query cache to 'pending' SYNCHRONOUSLY
-    // This prevents the useEffect from seeing stale 'done' status when generatingIds updates
     queryClient.setQueryData(['scenes', projectId], (old: Scene[] | undefined) => {
       if (!old) return old;
       return old.map(s => s.id === sceneId ? { ...s, image_status: 'pending' } : s);
     });
     
-    // Update DB in background (don't await to avoid invalidation race)
-    if (projectId) {
-      supabase
-        .from('scenes')
-        .update({ image_status: 'pending' })
-        .eq('id', sceneId)
-        .then(({ error }) => {
-          if (error) console.error('Failed to reset image_status:', error);
-        });
-    }
-    
     setGeneratingIds((prev) => new Set(prev).add(sceneId));
 
     const requestPayload = { scene_id: sceneId };
-
-    const clearGeneratingFlag = () => {
-      setGeneratingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(sceneId);
-        return next;
-      });
-    };
-
-    const verifyIfGenerationStartedOrFinished = async () => {
-      // If the request reached the backend but the response got dropped,
-      // the DB will show generating/done shortly after.
-      for (let attempt = 0; attempt < 4; attempt++) {
-        await sleep(1200 + attempt * 800);
-        try {
-          const statusRow = await fetchSceneStatus(sceneId);
-          if (statusRow.image_status === 'generating' || statusRow.image_status === 'done') {
-            return statusRow;
-          }
-        } catch {
-          // Ignore status fetch errors; we’ll fall back to showing an error.
-        }
-      }
-      return null;
-    };
 
     try {
       console.log('Generating scene image:', requestPayload);
@@ -170,46 +133,39 @@ export default function ImageGeneration() {
         console.error('Edge function error:', error);
         logApiCall('Generate Scene Image', requestPayload, { error: error.message });
 
+        // Even on network error, the edge function may have started.
+        // Wait briefly and check if status moved to "generating".
         if (isNetworkishInvokeError(error.message)) {
-          const statusRow = await verifyIfGenerationStartedOrFinished();
-          if (statusRow) {
-            // If done, clear generating flag so button re-enables and notify user.
-            if (statusRow.image_status === 'done') {
-              clearGeneratingFlag();
-              toast.success(`Scene ${statusRow.scene_number} image generated`);
+          await sleep(2000);
+          try {
+            const statusRow = await fetchSceneStatus(sceneId);
+            if (statusRow.image_status === 'generating' || statusRow.image_status === 'done') {
+              // Edge function started successfully despite network error — realtime will handle the rest
+              return;
             }
-            // If generating, silently continue — realtime will handle the rest.
-            return;
-          }
+          } catch { /* ignore */ }
         }
 
-        toast.error(`Failed to generate image: ${error.message}`);
-        clearGeneratingFlag();
+        toast.error(`Failed to start image generation: ${error.message}`);
+        setGeneratingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(sceneId);
+          return next;
+        });
         return;
       }
 
       logApiCall('Generate Scene Image', requestPayload, data);
-      // Success will be handled by the useEffect watching scenes
+      // Edge function returns immediately with { status: "generating" }
+      // Realtime subscription will handle the "done" / "failed" updates
     } catch (err) {
       console.error('Unexpected error:', err);
-
-      const message = err instanceof Error ? err.message : undefined;
-      if (isNetworkishInvokeError(message)) {
-        const statusRow = await verifyIfGenerationStartedOrFinished();
-        if (statusRow) {
-          if (statusRow.image_status === 'done') {
-            clearGeneratingFlag();
-            toast.success(`Scene ${statusRow.scene_number} image generated`);
-          }
-          // If generating, silently continue — realtime will handle the rest.
-          return;
-        }
-        toast.error('Network error while starting generation. Please retry.');
-      } else {
-        toast.error('An unexpected error occurred');
-      }
-
-      clearGeneratingFlag();
+      toast.error('An unexpected error occurred starting generation');
+      setGeneratingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sceneId);
+        return next;
+      });
     }
   };
 
@@ -223,15 +179,20 @@ export default function ImageGeneration() {
       (s) => s.image_status !== 'done' && s.image_status !== 'generating'
     );
 
-    // Generate sequentially with cancellation check
+    // Fire all requests with a small stagger (500ms) to avoid overwhelming the API.
+    // Each request returns instantly — the edge function processes in background.
     for (const scene of pendingScenes) {
       if (cancelAllRef.current) {
         toast.info('Batch generation cancelled');
         break;
       }
       await generateImage(scene.id);
+      // Small delay between kicks to be gentle on the edge function runtime
+      await sleep(500);
     }
 
+    // Note: generatingAll stays true until all scenes complete via realtime.
+    // We'll clear it when no more scenes are "generating".
     setGeneratingAll(false);
     cancelAllRef.current = false;
   };

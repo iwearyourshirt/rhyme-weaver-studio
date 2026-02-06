@@ -115,11 +115,8 @@ function getShotTypeInstruction(shotType: string): string {
    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
    const supabase = createClient(supabaseUrl, supabaseServiceKey);
    
-   let sceneId: string | undefined;
-   
    try {
      const { scene_id } = await req.json();
-     sceneId = scene_id;
      
      if (!scene_id) {
        return new Response(
@@ -131,7 +128,6 @@ function getShotTypeInstruction(shotType: string): string {
      console.log(`Generating scene image for scene ${scene_id}`);
      
      const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
-     
      if (!openaiApiKey) {
        console.error("OPENAI_API_KEY is not configured");
        return new Response(
@@ -140,355 +136,225 @@ function getShotTypeInstruction(shotType: string): string {
        );
      }
      
-      // Fetch the scene to get the image prompt, project_id, characters_in_scene, and shot_type
-      const { data: scene, error: sceneError } = await supabase
-        .from("scenes")
-        .select("image_prompt, project_id, characters_in_scene, shot_type")
-        .eq("id", scene_id)
-        .single();
-      
-      if (sceneError || !scene) {
-        console.error("Failed to fetch scene:", sceneError);
-        return new Response(
-          JSON.stringify({ error: "Scene not found" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
-      const shotType = scene.shot_type || "medium";
-      console.log(`Image prompt: ${scene.image_prompt}`);
-      console.log(`Shot type: ${shotType}`);
-      console.log(`Characters in scene: ${JSON.stringify(scene.characters_in_scene)}`);
+     // Fetch the scene
+     const { data: scene, error: sceneError } = await supabase
+       .from("scenes")
+       .select("image_prompt, project_id, characters_in_scene, shot_type")
+       .eq("id", scene_id)
+       .single();
      
-      // Fetch project creative direction
-      const { data: project, error: projectError } = await supabase
-        .from("projects")
-        .select("style_direction, cinematography_direction")
-        .eq("id", scene.project_id)
-        .single();
-      
-      const styleDirection = project?.style_direction || "";
-      const cinematographyDirection = project?.cinematography_direction || "";
-      
-      console.log(`Style direction: ${styleDirection}`);
-      console.log(`Cinematography: ${cinematographyDirection}`);
+     if (sceneError || !scene) {
+       console.error("Failed to fetch scene:", sceneError);
+       return new Response(
+         JSON.stringify({ error: "Scene not found" }),
+         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+       );
+     }
      
-     // Update status to "generating"
-     const { error: statusError } = await supabase
+     // Set status to "generating" immediately
+     await supabase
        .from("scenes")
        .update({ image_status: "generating" })
        .eq("id", scene_id);
      
-     if (statusError) {
-       console.error("Failed to update status to generating:", statusError);
-     }
-     
-     // Fetch ALL characters for this project (we need environment chars too)
-     const { data: characters, error: charsError } = await supabase
-       .from("characters")
-       .select("id, name, primary_image_url, character_type")
-       .eq("project_id", scene.project_id);
-     
-     if (charsError) {
-       console.error("Failed to fetch characters:", charsError);
-     }
-     
-     const charList = (characters || []) as Character[];
-     console.log(`Found ${charList.length} characters in project`);
-     
-      // Determine which characters to include:
-      // 1. Environment characters ALWAYS get included
-      // 2. Regular characters if they appear in characters_in_scene OR are mentioned in the image_prompt (case-insensitive)
-      const charactersInScene = (scene.characters_in_scene || []) as string[];
-      const promptLowerForCharScan = scene.image_prompt.toLowerCase();
-      const referenceImages: DownloadedImage[] = [];
-      const includedCharacters: string[] = [];
-      const skippedCharacters: string[] = [];
-      const includedAsEnvironment: string[] = [];
-      const includedAsCharacterMatch: string[] = [];
-      
-      // Process all characters
-      for (const char of charList) {
-        const isEnvironment = char.character_type === "environment";
-        const isInScene = charactersInScene.some(
-          (name) => name.toLowerCase() === char.name.toLowerCase()
-        );
-        // Also check if the character name appears in the image prompt text
-        const isInPrompt = promptLowerForCharScan.includes(char.name.toLowerCase());
-        
-        const shouldInclude = isEnvironment || isInScene || isInPrompt;
-        
-        if (!shouldInclude) {
-          console.log(`Character "${char.name}" is not in scene, not in prompt, and not environment - skipping`);
-          continue;
-        }
-        
-        if (!char.primary_image_url) {
-          console.log(`Character "${char.name}" has no reference image - skipping`);
-          skippedCharacters.push(char.name);
-          continue;
-        }
-        
-        // Download and convert to base64
-        console.log(`Downloading reference image for "${char.name}": ${char.primary_image_url}`);
-        const imageData = await downloadImage(char.primary_image_url, `${char.name.replace(/\s+/g, '_')}.png`);
-        
-        if (imageData) {
-          referenceImages.push(imageData);
-          includedCharacters.push(char.name);
-          
-          if (isEnvironment) {
-            includedAsEnvironment.push(char.name);
-            console.log(`Added reference image for "${char.name}" (ENVIRONMENT - always included)`);
-          } else if (isInPrompt && !isInScene) {
-            includedAsCharacterMatch.push(char.name);
-            console.log(`Added reference image for "${char.name}" (found in prompt text)`);
-          } else {
-            includedAsCharacterMatch.push(char.name);
-            console.log(`Added reference image for "${char.name}" (character match)`);
-          }
-        } else {
-          console.log(`Failed to download reference image for "${char.name}" - skipping`);
-          skippedCharacters.push(char.name);
-        }
-      }
-      
-      // Also check if any names in characters_in_scene didn't match any character record
-      for (const charName of charactersInScene) {
-        const matchedChar = charList.find(
-          (c) => c.name.toLowerCase() === charName.toLowerCase()
-        );
-        if (!matchedChar) {
-          console.log(`Character "${charName}" from scene not found in character records - skipping`);
-          if (!skippedCharacters.includes(charName)) {
-            skippedCharacters.push(charName);
-          }
-        }
-      }
-     
-     console.log(`Reference images to send: ${referenceImages.length}`);
-     console.log(`Included characters: ${includedCharacters.join(", ") || "none"}`);
-     console.log(`  - As environment: ${includedAsEnvironment.join(", ") || "none"}`);
-     console.log(`  - As character match: ${includedAsCharacterMatch.join(", ") || "none"}`);
-     console.log(`Skipped characters: ${skippedCharacters.join(", ") || "none"}`);
-     
-      // Build the prompt with creative direction, shot type framing, and reference image instructions
-      const shotTypeInstruction = getShotTypeInstruction(shotType);
-      
-      // Check if style keywords already exist in prompt to avoid redundancy
-      const promptLower = scene.image_prompt.toLowerCase();
-      const styleAlreadyInPrompt = styleDirection && 
-        styleDirection.toLowerCase().split(/\s+/).some((word: string) => 
-          word.length > 3 && promptLower.includes(word.toLowerCase())
-        );
-      
-      // Build style prefix (only if not redundant)
-      let stylePrefix = "";
-      if (styleDirection && !styleAlreadyInPrompt) {
-        stylePrefix = `${styleDirection} style. `;
-      }
-      
-      // Add cinematography if present
-      let cinematographyPrefix = "";
-      if (cinematographyDirection) {
-        cinematographyPrefix = `${cinematographyDirection}. `;
-      }
-      
-      let finalPrompt = `${stylePrefix}${cinematographyPrefix}${shotTypeInstruction} ${scene.image_prompt}`;
-      
-      if (referenceImages.length > 0) {
-        finalPrompt = `Use the provided reference images as character and environment design guides. Match their exact appearance, proportions, colors, and style. ${stylePrefix}${cinematographyPrefix}${shotTypeInstruction} ${scene.image_prompt}`;
-      }
-      
-      console.log(`Final prompt: ${finalPrompt}`);
-     
-     let openaiResponse: Response;
-     
-     // If we have reference images, use the edits endpoint with multipart form data
-     // Otherwise, use the simple generations endpoint
-     if (referenceImages.length > 0) {
-       console.log(`Using /v1/images/edits endpoint with ${referenceImages.length} reference images`);
-       
-       // Build multipart form data
-       const formData = new FormData();
-       formData.append("model", "gpt-image-1");
-       formData.append("prompt", finalPrompt);
-       formData.append("size", "1536x1024");
-       formData.append("quality", "medium");
-       formData.append("n", "1");
-       
-       // Add each reference image as image[]
-       for (const refImage of referenceImages) {
-         const blob = new Blob([refImage.bytes.buffer as ArrayBuffer], { type: refImage.mimeType });
-         formData.append("image[]", blob, refImage.name);
+     // Return immediately — the heavy work happens in the background
+     // EdgeRuntime.waitUntil keeps the function alive after sending the response
+     const backgroundWork = (async () => {
+       try {
+         const shotType = scene.shot_type || "medium";
+         console.log(`[BG] Image prompt: ${scene.image_prompt}`);
+         console.log(`[BG] Shot type: ${shotType}`);
+         
+         // Fetch project creative direction
+         const { data: project } = await supabase
+           .from("projects")
+           .select("style_direction, cinematography_direction")
+           .eq("id", scene.project_id)
+           .single();
+         
+         const styleDirection = project?.style_direction || "";
+         const cinematographyDirection = project?.cinematography_direction || "";
+         
+         // Fetch ALL characters for this project
+         const { data: characters } = await supabase
+           .from("characters")
+           .select("id, name, primary_image_url, character_type")
+           .eq("project_id", scene.project_id);
+         
+         const charList = (characters || []) as Character[];
+         console.log(`[BG] Found ${charList.length} characters in project`);
+         
+         // Determine which characters to include
+         const charactersInScene = (scene.characters_in_scene || []) as string[];
+         const promptLowerForCharScan = scene.image_prompt.toLowerCase();
+         const referenceImages: DownloadedImage[] = [];
+         const includedCharacters: string[] = [];
+         
+         for (const char of charList) {
+           const isEnvironment = char.character_type === "environment";
+           const isInScene = charactersInScene.some(
+             (name) => name.toLowerCase() === char.name.toLowerCase()
+           );
+           const isInPrompt = promptLowerForCharScan.includes(char.name.toLowerCase());
+           
+           if (!(isEnvironment || isInScene || isInPrompt)) continue;
+           if (!char.primary_image_url) continue;
+           
+           console.log(`[BG] Downloading reference image for "${char.name}"`);
+           const imageData = await downloadImage(char.primary_image_url, `${char.name.replace(/\s+/g, '_')}.png`);
+           
+           if (imageData) {
+             referenceImages.push(imageData);
+             includedCharacters.push(char.name);
+           }
+         }
+         
+         console.log(`[BG] Reference images to send: ${referenceImages.length}`);
+         
+         // Build prompt
+         const shotTypeInstruction = getShotTypeInstruction(shotType);
+         const promptLower = scene.image_prompt.toLowerCase();
+         const styleAlreadyInPrompt = styleDirection && 
+           styleDirection.toLowerCase().split(/\s+/).some((word: string) => 
+             word.length > 3 && promptLower.includes(word.toLowerCase())
+           );
+         
+         let stylePrefix = "";
+         if (styleDirection && !styleAlreadyInPrompt) {
+           stylePrefix = `${styleDirection} style. `;
+         }
+         let cinematographyPrefix = "";
+         if (cinematographyDirection) {
+           cinematographyPrefix = `${cinematographyDirection}. `;
+         }
+         
+         let finalPrompt = `${stylePrefix}${cinematographyPrefix}${shotTypeInstruction} ${scene.image_prompt}`;
+         if (referenceImages.length > 0) {
+           finalPrompt = `Use the provided reference images as character and environment design guides. Match their exact appearance, proportions, colors, and style. ${stylePrefix}${cinematographyPrefix}${shotTypeInstruction} ${scene.image_prompt}`;
+         }
+         
+         console.log(`[BG] Final prompt: ${finalPrompt}`);
+         
+         // Call OpenAI
+         let openaiResponse: Response;
+         
+         if (referenceImages.length > 0) {
+           const formData = new FormData();
+           formData.append("model", "gpt-image-1");
+           formData.append("prompt", finalPrompt);
+           formData.append("size", "1536x1024");
+           formData.append("quality", "medium");
+           formData.append("n", "1");
+           
+           for (const refImage of referenceImages) {
+             const blob = new Blob([refImage.bytes.buffer as ArrayBuffer], { type: refImage.mimeType });
+             formData.append("image[]", blob, refImage.name);
+           }
+           
+           openaiResponse = await fetch("https://api.openai.com/v1/images/edits", {
+             method: "POST",
+             headers: { "Authorization": `Bearer ${openaiApiKey}` },
+             body: formData,
+           });
+         } else {
+           openaiResponse = await fetch("https://api.openai.com/v1/images/generations", {
+             method: "POST",
+             headers: {
+               "Authorization": `Bearer ${openaiApiKey}`,
+               "Content-Type": "application/json",
+             },
+             body: JSON.stringify({
+               model: "gpt-image-1",
+               prompt: finalPrompt,
+               size: "1536x1024",
+               quality: "medium",
+               n: 1,
+             }),
+           });
+         }
+         
+         if (!openaiResponse.ok) {
+           const errorText = await openaiResponse.text();
+           console.error("[BG] OpenAI API error:", openaiResponse.status, errorText);
+           await supabase.from("scenes").update({ image_status: "failed" }).eq("id", scene_id);
+           return;
+         }
+         
+         const openaiData = await openaiResponse.json();
+         console.log("[BG] OpenAI response received");
+         
+         const imageResult = openaiData.data?.[0];
+         let imageBytes: Uint8Array;
+         
+         if (imageResult?.b64_json) {
+           const binaryString = atob(imageResult.b64_json);
+           imageBytes = new Uint8Array(binaryString.length);
+           for (let i = 0; i < binaryString.length; i++) {
+             imageBytes[i] = binaryString.charCodeAt(i);
+           }
+         } else if (imageResult?.url) {
+           const imageResponse = await fetch(imageResult.url);
+           imageBytes = new Uint8Array(await imageResponse.arrayBuffer());
+         } else {
+           console.error("[BG] No image data in response:", JSON.stringify(openaiData));
+           await supabase.from("scenes").update({ image_status: "failed" }).eq("id", scene_id);
+           return;
+         }
+         
+         // Upload to storage
+         const filePath = `${scene.project_id}/scenes/${scene_id}.png`;
+         console.log(`[BG] Uploading to character-images/${filePath}`);
+         
+         const { error: uploadError } = await supabase.storage
+           .from("character-images")
+           .upload(filePath, imageBytes, { contentType: "image/png", upsert: true });
+         
+         if (uploadError) {
+           console.error("[BG] Upload error:", uploadError);
+           await supabase.from("scenes").update({ image_status: "failed" }).eq("id", scene_id);
+           return;
+         }
+         
+         const { data: publicUrlData } = supabase.storage
+           .from("character-images")
+           .getPublicUrl(filePath);
+         
+         const imageUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
+         console.log(`[BG] Image uploaded: ${imageUrl}`);
+         
+         // Log cost
+         await logAICost(supabaseUrl, supabaseServiceKey, scene.project_id, "openai-gpt-image-1", `Generate scene ${scene_id.substring(0, 8)} image`, 0.04);
+         
+         // Update scene with result
+         const { error: updateError } = await supabase
+           .from("scenes")
+           .update({ image_url: imageUrl, image_status: "done" })
+           .eq("id", scene_id);
+         
+         if (updateError) {
+           console.error("[BG] Failed to update scene:", updateError);
+         } else {
+           console.log(`[BG] Scene ${scene_id} updated successfully`);
+         }
+       } catch (error) {
+         console.error("[BG] Background generation error:", error);
+         await supabase.from("scenes").update({ image_status: "failed" }).eq("id", scene_id);
        }
-       
-       openaiResponse = await fetch("https://api.openai.com/v1/images/edits", {
-         method: "POST",
-         headers: {
-           "Authorization": `Bearer ${openaiApiKey}`,
-           // Note: Don't set Content-Type for FormData - browser/fetch sets it with boundary
-         },
-         body: formData,
-       });
-     } else {
-       console.log(`Using /v1/images/generations endpoint (no reference images)`);
-       
-       openaiResponse = await fetch("https://api.openai.com/v1/images/generations", {
-         method: "POST",
-         headers: {
-           "Authorization": `Bearer ${openaiApiKey}`,
-           "Content-Type": "application/json",
-         },
-         body: JSON.stringify({
-           model: "gpt-image-1",
-           prompt: finalPrompt,
-           size: "1536x1024",
-           quality: "medium",
-           n: 1,
-         }),
-       });
+     })();
+     
+     // Keep the function alive for background work
+     // @ts-ignore - EdgeRuntime is available in Supabase edge functions
+     if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+       EdgeRuntime.waitUntil(backgroundWork);
      }
-     
-     if (!openaiResponse.ok) {
-       const errorText = await openaiResponse.text();
-       console.error("OpenAI API error:", openaiResponse.status, errorText);
-       
-       // Set status to failed
-       await supabase
-         .from("scenes")
-         .update({ image_status: "failed" })
-         .eq("id", scene_id);
-       
-       return new Response(
-         JSON.stringify({ error: "Failed to generate image", details: errorText }),
-         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-       );
-     }
-     
-     const openaiData = await openaiResponse.json();
-     console.log("OpenAI response received");
-     
-     // The response contains base64 encoded image data in data[0].b64_json
-     const imageResult = openaiData.data?.[0];
-     let imageBytes: Uint8Array;
-     
-     if (imageResult?.b64_json) {
-       // Decode base64 image
-       const binaryString = atob(imageResult.b64_json);
-       imageBytes = new Uint8Array(binaryString.length);
-       for (let i = 0; i < binaryString.length; i++) {
-         imageBytes[i] = binaryString.charCodeAt(i);
-       }
-     } else if (imageResult?.url) {
-       // Download from URL if provided
-       const imageResponse = await fetch(imageResult.url);
-       imageBytes = new Uint8Array(await imageResponse.arrayBuffer());
-     } else {
-       console.error("No image data in response:", JSON.stringify(openaiData));
-       
-       // Set status to failed
-       await supabase
-         .from("scenes")
-         .update({ image_status: "failed" })
-         .eq("id", scene_id);
-       
-       return new Response(
-         JSON.stringify({ error: "No image data in OpenAI response", details: JSON.stringify(openaiData) }),
-         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-       );
-     }
-     
-     // Upload to character-images bucket at path: {project_id}/scenes/{scene_id}.png
-     const filePath = `${scene.project_id}/scenes/${scene_id}.png`;
-     
-     console.log(`Uploading to character-images/${filePath}`);
-     
-     const { error: uploadError } = await supabase.storage
-       .from("character-images")
-       .upload(filePath, imageBytes, {
-         contentType: "image/png",
-         upsert: true, // Allow overwriting for regeneration
-       });
-     
-     if (uploadError) {
-       console.error("Upload error:", uploadError);
-       
-       // Set status to failed
-       await supabase
-         .from("scenes")
-         .update({ image_status: "failed" })
-         .eq("id", scene_id);
-       
-       return new Response(
-         JSON.stringify({ error: "Failed to upload image", details: uploadError.message }),
-         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-       );
-     }
-     
-     // Get public URL
-     const { data: publicUrlData } = supabase.storage
-       .from("character-images")
-       .getPublicUrl(filePath);
-     
-     // Add cache-busting query param for regeneration
-     const imageUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
-     console.log(`Image uploaded: ${imageUrl}`);
-     
-      // Log AI cost - gpt-image-1 medium quality: $0.04 per image
-      await logAICost(
-        supabaseUrl,
-        supabaseServiceKey,
-        scene.project_id,
-        "openai-gpt-image-1",
-        `Generate scene ${scene_id.substring(0, 8)} image`,
-        0.04
-      );
-      
-      // Update scene record with the new image URL and set status to "complete"
-      const { error: updateError } = await supabase
-        .from("scenes")
-        .update({
-          image_url: imageUrl,
-           image_status: "done",
-        })
-        .eq("id", scene_id);
-      
-      if (updateError) {
-        console.error("Failed to update scene:", updateError);
-        return new Response(
-          JSON.stringify({ error: "Failed to update scene", details: updateError.message }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
-      console.log(`Scene ${scene_id} updated successfully`);
      
      return new Response(
-       JSON.stringify({
-         success: true,
-         image_url: imageUrl,
-         scene_id: scene_id,
-         reference_images_count: referenceImages.length,
-         included_characters: includedCharacters,
-         skipped_characters: skippedCharacters,
-          included_as_environment: includedAsEnvironment,
-          included_as_character_match: includedAsCharacterMatch,
-       }),
+       JSON.stringify({ status: "generating", scene_id }),
        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
      );
    } catch (error) {
-     console.error("Unexpected error:", error);
+     console.error("Request error:", error);
      const errorMessage = error instanceof Error ? error.message : "Unexpected error";
-     
-     // Set status to failed if we have a scene_id
-     if (sceneId) {
-       await supabase
-         .from("scenes")
-         .update({ image_status: "failed" })
-         .eq("id", sceneId);
-     }
-     
      return new Response(
        JSON.stringify({ error: errorMessage }),
        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
