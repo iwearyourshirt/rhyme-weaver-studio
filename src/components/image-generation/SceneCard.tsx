@@ -34,7 +34,7 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-const ESTIMATED_GENERATION_TIME = 45; // seconds
+const ESTIMATED_GENERATION_TIME = 90; // seconds - OpenAI gpt-image-1 typically takes 40-90s
 
 export function SceneCard({
   scene,
