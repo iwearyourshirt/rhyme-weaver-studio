@@ -185,11 +185,14 @@ function getShotTypeInstruction(shotType: string): string {
          console.log(`[BG] Found ${charList.length} characters in project`);
          
          // Determine which characters to include
-         const charactersInScene = (scene.characters_in_scene || []) as string[];
-         const promptLowerForCharScan = scene.image_prompt.toLowerCase();
-         const referenceImages: DownloadedImage[] = [];
-         const includedCharacters: string[] = [];
-         
+          const charactersInScene = (scene.characters_in_scene || []) as string[];
+          const promptLowerForCharScan = scene.image_prompt.toLowerCase();
+          const referenceImages: DownloadedImage[] = [];
+          const includedCharacters: string[] = [];
+          
+          // Track whether any actual characters (non-environment) are included
+          let hasNonEnvironmentReference = false;
+          
           for (const char of charList) {
             const isEnvironment = char.character_type === "environment";
             const isInScene = charactersInScene.some(
@@ -198,18 +201,28 @@ function getShotTypeInstruction(shotType: string): string {
             const isInPrompt = promptLowerForCharScan.includes(char.name.toLowerCase());
             
             // Only include if explicitly in characters_in_scene list OR mentioned by name in the prompt
-            // Environments are no longer auto-included — they must be referenced by name like characters
             if (!(isInScene || isInPrompt)) continue;
-           if (!char.primary_image_url) continue;
-           
-           console.log(`[BG] Downloading reference image for "${char.name}"`);
-           const imageData = await downloadImage(char.primary_image_url, `${char.name.replace(/\s+/g, '_')}.png`);
-           
-           if (imageData) {
-             referenceImages.push(imageData);
-             includedCharacters.push(char.name);
-           }
-         }
+            if (!char.primary_image_url) continue;
+            
+            if (!isEnvironment) {
+              hasNonEnvironmentReference = true;
+            }
+            
+            console.log(`[BG] Downloading reference image for "${char.name}"`);
+            const imageData = await downloadImage(char.primary_image_url, `${char.name.replace(/\s+/g, '_')}.png`);
+            
+            if (imageData) {
+              referenceImages.push(imageData);
+              includedCharacters.push(char.name);
+            }
+          }
+          
+          // If we ONLY have environment references and no characters, skip reference images
+          // to prevent OpenAI from hallucinating characters from environment images
+          if (!hasNonEnvironmentReference) {
+            console.log(`[BG] No character references — using text-only generation to avoid hallucinated characters`);
+            referenceImages.length = 0;
+          }
          
          console.log(`[BG] Reference images to send: ${referenceImages.length}`);
          
