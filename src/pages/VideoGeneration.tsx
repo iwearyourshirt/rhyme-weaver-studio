@@ -101,9 +101,12 @@ export default function VideoGeneration() {
     if (!projectId) return;
 
     try {
-      const response = await supabase.functions.invoke('poll-video-status', {
-        body: { project_id: projectId },
-      });
+      // Route through serial queue to avoid connection pool exhaustion
+      const response = await edgeFunctionQueue.enqueue(() =>
+        supabase.functions.invoke('poll-video-status', {
+          body: { project_id: projectId },
+        })
+      );
 
       if (response.error) {
         console.error('Poll error:', response.error);
