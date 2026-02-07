@@ -39,6 +39,7 @@ export default function VideoGeneration() {
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isCancellingAll, setIsCancellingAll] = useState(false);
+  const [isBatchSubmitting, setIsBatchSubmitting] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const toastShownRef = useRef<Set<string>>(new Set());
   const generationStartTimesRef = useRef<Map<string, number>>(new Map());
@@ -175,17 +176,23 @@ export default function VideoGeneration() {
     }
   }, [projectId, logApiCall, updateVideoSceneStatus, refetchScenes]);
 
-  // Start/stop polling based on generating scenes
+  // Start/stop polling based on generating scenes — pause during batch submission
   useEffect(() => {
+    if (isBatchSubmitting) {
+      // Fix 2: Pause polling during batch submission to avoid collisions
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      return;
+    }
+
     const hasGenerating = scenes?.some((s) => s.video_status === 'generating');
 
     if (hasGenerating && !pollIntervalRef.current) {
-      // Start polling
       pollIntervalRef.current = setInterval(pollVideoStatus, POLL_INTERVAL);
-      // Also poll immediately
       pollVideoStatus();
     } else if (!hasGenerating && pollIntervalRef.current) {
-      // Stop polling
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
@@ -196,7 +203,7 @@ export default function VideoGeneration() {
         pollIntervalRef.current = null;
       }
     };
-  }, [scenes, pollVideoStatus]);
+  }, [scenes, pollVideoStatus, isBatchSubmitting]);
 
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -288,12 +295,16 @@ export default function VideoGeneration() {
     }
 
     setIsGeneratingAll(true);
+    setIsBatchSubmitting(true); // Fix 2: Pause polling during batch submission
 
-    // All requests go through the serial queue — no need for manual staggering
-    await Promise.all(pendingScenes.map((s) => generateVideo(s.id)));
-
-    setIsGeneratingAll(false);
-    toast.success('All video generations submitted');
+    try {
+      // All requests go through the serial queue — no need for manual staggering
+      await Promise.all(pendingScenes.map((s) => generateVideo(s.id)));
+      toast.success('All video generations submitted');
+    } finally {
+      setIsBatchSubmitting(false); // Resume polling
+      setIsGeneratingAll(false);
+    }
   };
 
   const handleCancelAll = async () => {

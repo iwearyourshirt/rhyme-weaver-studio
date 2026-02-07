@@ -162,6 +162,7 @@ export type Database = {
           video_error: string | null
           video_request_id: string | null
           video_status: string
+          video_status_updated_at: string | null
           video_url: string | null
         }
         Insert: {
@@ -184,6 +185,7 @@ export type Database = {
           video_error?: string | null
           video_request_id?: string | null
           video_status?: string
+          video_status_updated_at?: string | null
           video_url?: string | null
         }
         Update: {
@@ -206,6 +208,7 @@ export type Database = {
           video_error?: string | null
           video_request_id?: string | null
           video_status?: string
+          video_status_updated_at?: string | null
           video_url?: string | null
         }
         Relationships: [

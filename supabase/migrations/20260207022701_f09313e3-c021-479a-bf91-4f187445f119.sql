@@ -1,0 +1,1 @@
+ALTER TABLE public.scenes ADD COLUMN video_status_updated_at timestamptz DEFAULT null;
