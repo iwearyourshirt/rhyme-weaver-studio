@@ -5,6 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 // LTX Video 2.0 Fast - 30x faster than Kling (~10-30 seconds vs 4-5 minutes)
@@ -27,6 +28,23 @@ function getCameraMovementForShotType(shotType: string): string {
     "over-shoulder": "Gentle drift from behind the shoulder toward the subject.",
   };
   return movements[shotType] || movements["medium"];
+}
+
+// Fetch with timeout helper
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeout);
+    return response;
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Request timed out");
+    }
+    throw error;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -70,14 +88,8 @@ Deno.serve(async (req) => {
     // Record generation start time
     const generationStartTime = Date.now();
 
-    // Submit to fal.ai queue (async processing)
-    // LTX Video 2.0 Fast parameters differ from Kling:
-    // - duration: number (6, 8, 10, or 20), not string
-    // - resolution: "1080p", "1440p", or "2160p"
-    // - fps: 25 or 50
-    // - generate_audio: boolean
-    // - NO aspect_ratio param (always outputs 16:9)
-    const falResponse = await fetch(FAL_VIDEO_ENDPOINT, {
+    // Submit to fal.ai queue (async processing) with timeout
+    const falResponse = await fetchWithTimeout(FAL_VIDEO_ENDPOINT, {
       method: "POST",
       headers: {
         "Authorization": `Key ${FAL_API_KEY}`,
@@ -104,13 +116,14 @@ Deno.serve(async (req) => {
 
     console.log(`fal.ai request queued with ID: ${requestId}`);
 
-    // Update scene with request ID and generating status
+    // Update scene with request ID, generating status, and timestamp
     const { error: updateError } = await supabase
       .from("scenes")
       .update({
         video_status: "generating",
         video_request_id: requestId,
         video_error: null,
+        video_status_updated_at: new Date().toISOString(),
       })
       .eq("id", scene_id);
 

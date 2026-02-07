@@ -13,7 +13,7 @@ type QueueItem<T> = {
 class EdgeFunctionQueue {
   private queue: QueueItem<any>[] = [];
   private running = false;
-  private delayMs = 300; // minimum gap between requests
+  private delayMs = 500; // minimum gap between requests (500ms for video ops)
 
   async enqueue<T>(fn: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {

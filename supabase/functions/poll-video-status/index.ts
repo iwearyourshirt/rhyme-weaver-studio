@@ -5,16 +5,31 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// LTX Video 2.0 Fast
-// Full endpoint for submission: fal-ai/ltx-2/image-to-video/fast
-// Base model for status/result queries: fal-ai/ltx-2
 const VIDEO_MODEL_ENDPOINT = "fal-ai/ltx-2/image-to-video/fast";
 const VIDEO_MODEL_BASE = "fal-ai/ltx-2";
-
-// LTX Video cost: $0.04/second at 1080p, 6 second clips = $0.24
 const VIDEO_COST_PER_CLIP = 0.24;
+const STUCK_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+const FETCH_TIMEOUT_MS = 15000;
+
+// Fetch with timeout helper
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeout);
+    return response;
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Request timed out");
+    }
+    throw error;
+  }
+}
 
 // Cost logging helper
 async function logAICost(
@@ -94,7 +109,7 @@ Deno.serve(async (req) => {
     // Get all scenes that are currently generating
     const { data: generatingScenes, error: fetchError } = await supabase
       .from("scenes")
-      .select("id, scene_number, video_request_id")
+      .select("id, scene_number, video_request_id, video_status_updated_at")
       .eq("project_id", project_id)
       .eq("video_status", "generating")
       .not("video_request_id", "is", null);
@@ -105,11 +120,11 @@ Deno.serve(async (req) => {
 
     if (!generatingScenes || generatingScenes.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          updates: [], 
+        JSON.stringify({
+          success: true,
+          updates: [],
           model: VIDEO_MODEL_ENDPOINT,
-          message: "No scenes currently generating" 
+          message: "No scenes currently generating",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -117,29 +132,50 @@ Deno.serve(async (req) => {
 
     console.log(`Polling status for ${generatingScenes.length} scenes using ${VIDEO_MODEL_ENDPOINT}`);
 
-    const updates: Array<{ 
-      scene_id: string; 
-      scene_number: number; 
-      status: string; 
-      video_url?: string; 
+    const updates: Array<{
+      scene_id: string;
+      scene_number: number;
+      status: string;
+      video_url?: string;
       error?: string;
-      generation_time_ms?: number;
     }> = [];
 
-    // Poll each scene's status
+    const now = Date.now();
+
+    // Poll each scene's status — per-scene error isolation
     for (const scene of generatingScenes) {
       try {
-        // For models with subpaths like "fal-ai/ltx-2/image-to-video/fast",
-        // the queue status endpoint uses the BASE model path, not the full path
+        // Fix 3: Stuck scene recovery
+        if (scene.video_status_updated_at) {
+          const updatedAt = new Date(scene.video_status_updated_at).getTime();
+          if (now - updatedAt > STUCK_THRESHOLD_MS) {
+            console.log(`Scene ${scene.scene_number} stuck for >5min, resetting to pending`);
+            await supabase
+              .from("scenes")
+              .update({
+                video_status: "pending",
+                video_request_id: null,
+                video_error: "Generation timed out - please retry",
+                video_status_updated_at: new Date().toISOString(),
+              })
+              .eq("id", scene.id);
+
+            updates.push({
+              scene_id: scene.id,
+              scene_number: scene.scene_number,
+              status: "failed",
+              error: "Generation timed out - please retry",
+            });
+            continue; // Skip fal.ai check for this scene
+          }
+        }
+
         const statusUrl = `https://queue.fal.run/${VIDEO_MODEL_BASE}/requests/${scene.video_request_id}/status`;
-        
         console.log(`Checking status at: ${statusUrl}`);
-        
-        const statusResponse = await fetch(statusUrl, {
+
+        const statusResponse = await fetchWithTimeout(statusUrl, {
           method: "GET",
-          headers: {
-            "Authorization": `Key ${FAL_API_KEY}`,
-          },
+          headers: { "Authorization": `Key ${FAL_API_KEY}` },
         });
 
         if (!statusResponse.ok) {
@@ -152,48 +188,36 @@ Deno.serve(async (req) => {
         console.log(`Scene ${scene.scene_number} status:`, statusResult.status);
 
         if (statusResult.status === "COMPLETED") {
-          // Fetch the actual result using the base model path
           const resultUrl = `https://queue.fal.run/${VIDEO_MODEL_BASE}/requests/${scene.video_request_id}`;
-          const resultResponse = await fetch(resultUrl, {
+          const resultResponse = await fetchWithTimeout(resultUrl, {
             method: "GET",
-            headers: {
-              "Authorization": `Key ${FAL_API_KEY}`,
-            },
+            headers: { "Authorization": `Key ${FAL_API_KEY}` },
           });
 
           if (resultResponse.ok) {
             const result = await resultResponse.json();
-            // LTX Video 2.0 returns video in result.video.url
             const videoUrl = result.video?.url;
 
             if (videoUrl) {
-              // Dedup guard: only update if scene is still 'generating' (prevents double-logging on overlapping polls)
+              // Dedup guard: only update if scene is still 'generating'
               const { data: updateResult, error: updateError } = await supabase
                 .from("scenes")
                 .update({
                   video_status: "done",
                   video_url: videoUrl,
                   video_error: null,
+                  video_status_updated_at: new Date().toISOString(),
                 })
                 .eq("id", scene.id)
-                .eq("video_status", "generating") // Only update if still generating — atomic guard
+                .eq("video_status", "generating")
                 .select("id");
 
-              // If no rows updated, another poll already handled this scene
               if (updateError || !updateResult || updateResult.length === 0) {
                 console.log(`Scene ${scene.scene_number} already processed by another poll, skipping cost log`);
                 continue;
               }
 
-              // Log video generation cost only once (after successful atomic update)
-              await logAICost(
-                supabaseUrl,
-                supabaseKey,
-                project_id,
-                "fal-ltx-video-fast",
-                `Video clip scene ${scene.scene_number}`,
-                VIDEO_COST_PER_CLIP
-              );
+              await logAICost(supabaseUrl, supabaseKey, project_id, "fal-ltx-video-fast", `Video clip scene ${scene.scene_number}`, VIDEO_COST_PER_CLIP);
 
               updates.push({
                 scene_id: scene.id,
@@ -207,12 +231,13 @@ Deno.serve(async (req) => {
           }
         } else if (statusResult.status === "FAILED") {
           const errorMessage = statusResult.error || "Video generation failed";
-          
+
           await supabase
             .from("scenes")
             .update({
               video_status: "failed",
               video_error: errorMessage,
+              video_status_updated_at: new Date().toISOString(),
             })
             .eq("id", scene.id);
 
@@ -227,8 +252,8 @@ Deno.serve(async (req) => {
         }
         // If IN_QUEUE or IN_PROGRESS, do nothing - will check again next poll
       } catch (pollError) {
+        // Fix 1: Per-scene error isolation — log and continue
         console.error(`Error polling scene ${scene.id}:`, pollError);
-        // Don't mark as failed on poll errors, just continue
       }
     }
 
