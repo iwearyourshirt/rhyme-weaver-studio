@@ -104,12 +104,11 @@ export default function VideoGeneration() {
     if (!projectId) return;
 
     try {
-      // Route through serial queue to avoid connection pool exhaustion
-      const response = await edgeFunctionQueue.enqueue(() =>
-        supabase.functions.invoke('poll-video-status', {
-          body: { project_id: projectId },
-        })
-      );
+      // Polls run outside the serial queue to avoid blocking generate requests
+      // (during long generations, many polls queue up and block subsequent generates)
+      const response = await supabase.functions.invoke('poll-video-status', {
+        body: { project_id: projectId },
+      });
 
       if (response.error) {
         console.error('Poll error:', response.error);
