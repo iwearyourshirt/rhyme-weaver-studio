@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Wand2, Video, DollarSign, Download } from 'lucide-react';
+import { ArrowRight, Wand2, Video, DollarSign, Download, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -40,6 +40,9 @@ export default function VideoGeneration() {
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isCancellingAll, setIsCancellingAll] = useState(false);
   const [isBatchSubmitting, setIsBatchSubmitting] = useState(false);
+  const [showUnapprovedOnly, setShowUnapprovedOnly] = useState(() => {
+    try { return localStorage.getItem('video-filter-unapproved') === 'true'; } catch { return false; }
+  });
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const toastShownRef = useRef<Set<string>>(new Set());
   const generationStartTimesRef = useRef<Map<string, number>>(new Map());
@@ -433,6 +436,21 @@ export default function VideoGeneration() {
           <p className="text-sm text-muted-foreground mt-1">
             Animate each scene with gentle, dreamlike motion
           </p>
+          <button
+            onClick={() => {
+              const next = !showUnapprovedOnly;
+              setShowUnapprovedOnly(next);
+              try { localStorage.setItem('video-filter-unapproved', String(next)); } catch {}
+            }}
+            className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-colors mt-1.5 ${
+              showUnapprovedOnly
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-transparent text-muted-foreground border-border hover:border-foreground/30'
+            }`}
+          >
+            <Filter className="h-3 w-3" />
+            {showUnapprovedOnly ? 'Showing unchecked only' : 'Show unchecked only'}
+          </button>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
           <div className="text-xs text-muted-foreground font-mono">
@@ -509,7 +527,9 @@ export default function VideoGeneration() {
       {/* Scene Grid */}
       {scenes && scenes.length > 0 ? (
         <div className="grid grid-cols-1 gap-5">
-          {scenes.map((scene) => (
+          {scenes
+            .filter((scene) => !showUnapprovedOnly || !scene.video_approved)
+            .map((scene) => (
             <VideoSceneCard
               key={scene.id}
               scene={scene}
