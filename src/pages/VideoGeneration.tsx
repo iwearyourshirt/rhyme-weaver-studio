@@ -136,8 +136,9 @@ export default function VideoGeneration() {
           });
         });
 
-        // Also trigger a background refetch for full consistency
-        refetchScenes();
+        // No refetchScenes() here — the cache patch above is sufficient.
+        // Calling refetchScenes() races with approval mutations and can
+        // overwrite optimistic video_approved updates with stale DB data.
         
         for (const update of data.updates) {
           const generationEndTime = Date.now();
