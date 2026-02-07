@@ -565,13 +565,14 @@ export default function VideoGeneration() {
                 });
                 lastMutationTimeRef.current = Date.now();
               }}
-              onApprovalChange={(approved) => {
+              onApprovalChange={async (approved) => {
                 lastMutationTimeRef.current = Date.now();
-                updateScene.mutate({
+                await updateScene.mutateAsync({
                   id: scene.id,
                   projectId: projectId!,
                   updates: { video_approved: approved },
                 });
+                lastMutationTimeRef.current = Date.now();
               }}
               onDeleteVideo={() => handleDeleteVideo(scene.id)}
             />
