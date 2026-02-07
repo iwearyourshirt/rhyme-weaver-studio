@@ -1,14 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useUpdateScene } from '@/hooks/useScenes';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 const DEBOUNCE_MS = 800;
 
 /**
  * Manages a single scene's animation prompt with:
- * - Local state that is the source of truth
- * - Debounced auto-save to the database
- * - A `getLatestPrompt` callback for generation to read the current value
- * - `isDirty` flag (unsaved changes exist)
+ * - Local state as the source of truth (never overwritten by server)
+ * - Debounced auto-save to DB
+ * - `flushSave` to force-save before generation
+ * - `setAndSave` for AI rewrite
  */
 export function useAnimationPrompt(
   sceneId: string,
@@ -20,57 +21,58 @@ export function useAnimationPrompt(
   const isDirtyRef = useRef(false);
   const latestPromptRef = useRef(serverPrompt);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const initializedRef = useRef(false);
-  const updateScene = useUpdateScene();
-
-  // Only sync from server on initial mount or when sceneId changes
-  useEffect(() => {
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      setPrompt(serverPrompt);
-      latestPromptRef.current = serverPrompt;
-      isDirtyRef.current = false;
-    }
-  }, [sceneId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // If sceneId changes (different scene), re-initialize
   const prevSceneIdRef = useRef(sceneId);
-  useEffect(() => {
-    if (prevSceneIdRef.current !== sceneId) {
-      prevSceneIdRef.current = sceneId;
-      initializedRef.current = false;
-    }
-  }, [sceneId]);
+  const queryClient = useQueryClient();
+
+  // Re-initialize when sceneId changes (different scene)
+  if (prevSceneIdRef.current !== sceneId) {
+    prevSceneIdRef.current = sceneId;
+    setPrompt(serverPrompt);
+    latestPromptRef.current = serverPrompt;
+    isDirtyRef.current = false;
+  }
+
+  // Stable save function using refs — no dependencies that change per render
+  const sceneIdRef = useRef(sceneId);
+  const projectIdRef = useRef(projectId);
+  sceneIdRef.current = sceneId;
+  projectIdRef.current = projectId;
 
   const saveToDb = useCallback(async (value: string) => {
     setIsSaving(true);
     try {
-      await updateScene.mutateAsync({
-        id: sceneId,
-        projectId,
-        updates: { animation_prompt: value },
-      });
+      const { error } = await supabase
+        .from('scenes')
+        .update({ animation_prompt: value })
+        .eq('id', sceneIdRef.current);
+
+      if (error) throw error;
       isDirtyRef.current = false;
+
+      // Silently update cache without triggering refetch
+      queryClient.setQueryData<any[]>(['scenes', projectIdRef.current], (old) =>
+        old?.map((s) =>
+          s.id === sceneIdRef.current ? { ...s, animation_prompt: value } : s
+        ) ?? []
+      );
     } catch (err) {
       console.error('[useAnimationPrompt] Save failed:', err);
     } finally {
       setIsSaving(false);
     }
-  }, [sceneId, projectId, updateScene]);
+  }, [queryClient]);
 
   const onChange = useCallback((value: string) => {
     setPrompt(value);
     latestPromptRef.current = value;
     isDirtyRef.current = true;
 
-    // Debounced auto-save
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => {
       saveToDb(value);
     }, DEBOUNCE_MS);
   }, [saveToDb]);
 
-  // Force-save immediately (e.g., before generation)
   const flushSave = useCallback(async () => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -81,7 +83,6 @@ export function useAnimationPrompt(
     }
   }, [saveToDb]);
 
-  // Set prompt directly (e.g., from AI rewrite) and save immediately
   const setAndSave = useCallback(async (value: string) => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     setPrompt(value);
@@ -92,12 +93,11 @@ export function useAnimationPrompt(
 
   const getLatestPrompt = useCallback(() => latestPromptRef.current, []);
 
-  // Cleanup debounce timer on unmount — save any pending changes
+  // Cleanup: save pending changes on unmount
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
-        // Fire-and-forget save on unmount if dirty
         if (isDirtyRef.current) {
           saveToDb(latestPromptRef.current);
         }
@@ -112,6 +112,5 @@ export function useAnimationPrompt(
     setAndSave,
     getLatestPrompt,
     isSaving,
-    isDirty: isDirtyRef.current,
   };
 }
