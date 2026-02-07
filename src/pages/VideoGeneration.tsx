@@ -10,7 +10,9 @@ import { useScenesRealtime } from '@/hooks/useScenesRealtime';
 import { useDebug } from '@/contexts/DebugContext';
 import { VideoSceneCard } from '@/components/video-generation/VideoSceneCard';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import type { Scene } from '@/types/database';
 
 const COST_PER_VIDEO = 0.24; // LTX Video 2.0 Fast: $0.04/sec × 6 seconds
 const VIDEO_MODEL_ENDPOINT = "fal-ai/ltx-2/image-to-video/fast";
@@ -19,6 +21,7 @@ const POLL_INTERVAL = 5000; // 5 seconds - LTX is much faster than Kling
 export default function VideoGeneration() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: project } = useProject(projectId);
   const { data: scenes, isLoading } = useScenes(projectId);
   const updateScene = useUpdateScene();
@@ -104,9 +107,25 @@ export default function VideoGeneration() {
       const data = response.data;
       logApiCall('Poll Video Status', { project_id: projectId }, data);
 
-      // Show toasts and update debug context for completed videos
+      // Directly update the query cache for completed/failed videos
       if (data.updates && data.updates.length > 0) {
-        // Force immediate refetch to update UI
+        // Patch the cache immediately so the UI updates without waiting for a refetch
+        queryClient.setQueryData<Scene[]>(['scenes', projectId], (old) => {
+          if (!old) return old;
+          return old.map((scene) => {
+            const update = data.updates.find((u: any) => u.scene_id === scene.id);
+            if (!update) return scene;
+            if (update.status === 'done') {
+              return { ...scene, video_status: 'done' as const, video_url: update.video_url, video_error: null };
+            }
+            if (update.status === 'failed') {
+              return { ...scene, video_status: 'failed' as const, video_error: update.error || 'Generation failed' };
+            }
+            return scene;
+          });
+        });
+
+        // Also trigger a background refetch for full consistency
         refetchScenes();
         
         for (const update of data.updates) {
