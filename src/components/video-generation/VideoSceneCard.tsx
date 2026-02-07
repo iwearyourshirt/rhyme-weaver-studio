@@ -137,7 +137,7 @@ export function VideoSceneCard({
       .eq('id', scene.id);
   };
 
-  const isActuallyGenerating = isGenerating || scene.video_status === 'generating';
+  const isActuallyGenerating = scene.video_status === 'generating';
   const canGenerate = scene.image_status === 'done' && scene.image_url;
 
   const getAdaptiveProgress = () => {
