@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X, Download, Check, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { PromptFeedback } from '@/components/storyboard/PromptFeedback';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { useAnimationPrompt } from '@/hooks/useAnimationPrompt';
+import { supabase } from '@/integrations/supabase/client';
 import type { Scene, ShotType } from '@/types/database';
 
 const SHOT_TYPE_OPTIONS: { value: ShotType; label: string }[] = [
@@ -62,14 +62,30 @@ export function VideoSceneCard({
   const startTimeRef = useRef<number | null>(null);
   const isResumedRef = useRef(false);
 
-  // Use the new prompt hook — local state is the source of truth
-  const {
-    prompt: editedPrompt,
-    onChange: onPromptChange,
-    flushSave,
-    setAndSave,
-    isSaving,
-  } = useAnimationPrompt(scene.id, projectId, scene.animation_prompt);
+  // Simple local state for animation prompt
+  const [editedPrompt, setEditedPrompt] = useState(scene.animation_prompt || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const prevSceneIdRef = useRef(scene.id);
+
+  // Re-sync only when switching to a different scene
+  if (prevSceneIdRef.current !== scene.id) {
+    prevSceneIdRef.current = scene.id;
+    setEditedPrompt(scene.animation_prompt || '');
+  }
+
+  // Debounced auto-save
+  useEffect(() => {
+    if (editedPrompt === (scene.animation_prompt || '')) return;
+    const timer = setTimeout(async () => {
+      setIsSaving(true);
+      await supabase
+        .from('scenes')
+        .update({ animation_prompt: editedPrompt })
+        .eq('id', scene.id);
+      setIsSaving(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [editedPrompt, scene.id]);
 
   // Timer effect for generation progress
   useEffect(() => {
@@ -109,14 +125,16 @@ export function VideoSceneCard({
     setIsPlaying(false);
   };
 
-  const handleGenerate = async () => {
-    // Flush any pending debounced save before generating
-    await flushSave();
+  const handleGenerate = () => {
     onGenerate(editedPrompt);
   };
 
-  const handlePromptRewritten = (newPrompt: string) => {
-    setAndSave(newPrompt);
+  const handlePromptRewritten = async (newPrompt: string) => {
+    setEditedPrompt(newPrompt);
+    await supabase
+      .from('scenes')
+      .update({ animation_prompt: newPrompt })
+      .eq('id', scene.id);
   };
 
   const isActuallyGenerating = isGenerating || scene.video_status === 'generating';
@@ -318,7 +336,7 @@ export function VideoSceneCard({
             <CollapsibleContent className="space-y-3 pt-2">
               <Textarea
                 value={editedPrompt}
-                onChange={(e) => onPromptChange(e.target.value)}
+                onChange={(e) => setEditedPrompt(e.target.value)}
                 className="text-xs min-h-[60px] resize-none"
                 placeholder="Animation prompt..."
               />
