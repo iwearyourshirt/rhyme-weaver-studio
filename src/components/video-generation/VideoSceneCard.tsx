@@ -63,8 +63,9 @@ export function VideoSceneCard({
   const startTimeRef = useRef<number | null>(null);
   // Track whether this generation was initiated in-session vs already running on mount
   const isResumedRef = useRef(false);
-  // Track if user has unsaved local edits — prevents external refetches from resetting prompt
-  const hasLocalEditsRef = useRef(false);
+  // Timestamp of last successful save — blocks external syncs for a cooldown period
+  const lastSaveTimeRef = useRef<number>(0);
+  const SAVE_COOLDOWN_MS = 5000; // 5 seconds cooldown after save
 
   // Timer effect for generation progress
   useEffect(() => {
@@ -91,11 +92,14 @@ export function VideoSceneCard({
     }
   }, [scene.video_status]);
 
-  // Sync edited prompt from server ONLY when user has no local edits
+  // Sync edited prompt from server ONLY when no recent local save or edit
   useEffect(() => {
-    if (!hasLocalEditsRef.current) {
-      setEditedPrompt(scene.animation_prompt);
+    const timeSinceLastSave = Date.now() - lastSaveTimeRef.current;
+    if (timeSinceLastSave < SAVE_COOLDOWN_MS) {
+      // Still in cooldown after a save — ignore external sync
+      return;
     }
+    setEditedPrompt(scene.animation_prompt);
   }, [scene.animation_prompt]);
 
   const handlePlayPause = () => {
@@ -121,7 +125,7 @@ export function VideoSceneCard({
     setIsSaving(true);
     try {
       await onUpdatePrompt(editedPrompt);
-      hasLocalEditsRef.current = false; // Clear flag after successful save
+      lastSaveTimeRef.current = Date.now(); // Start cooldown
     } finally {
       setIsSaving(false);
     }
@@ -129,7 +133,7 @@ export function VideoSceneCard({
 
   const handlePromptRewritten = (newPrompt: string) => {
     setEditedPrompt(newPrompt);
-    hasLocalEditsRef.current = false; // AI rewrite saves immediately
+    lastSaveTimeRef.current = Date.now(); // Start cooldown
     onUpdatePrompt(newPrompt);
   };
 
@@ -312,7 +316,7 @@ export function VideoSceneCard({
             <CollapsibleContent className="space-y-3 pt-2">
               <Textarea
                 value={editedPrompt}
-                onChange={(e) => { setEditedPrompt(e.target.value); hasLocalEditsRef.current = true; }}
+                onChange={(e) => { setEditedPrompt(e.target.value); lastSaveTimeRef.current = Date.now(); }}
                 className="text-xs min-h-[60px] resize-none"
                 placeholder="Animation prompt..."
               />
