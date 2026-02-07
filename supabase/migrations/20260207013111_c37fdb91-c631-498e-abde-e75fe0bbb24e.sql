@@ -1,0 +1,1 @@
+ALTER TABLE public.scenes ADD COLUMN video_approved boolean NOT NULL DEFAULT false;

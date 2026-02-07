@@ -517,6 +517,13 @@ export default function VideoGeneration() {
                   updates: { shot_type: shotType }
                 });
               }}
+              onApprovalChange={(approved) => {
+                updateScene.mutate({
+                  id: scene.id,
+                  projectId: projectId!,
+                  updates: { video_approved: approved },
+                });
+              }}
             />
           ))}
         </div>

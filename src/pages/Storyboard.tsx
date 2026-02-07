@@ -238,7 +238,8 @@ export default function Storyboard() {
            video_url: null,
            video_status: 'pending',
            video_request_id: null,
-           video_error: null,
+            video_error: null,
+            video_approved: false,
          });
        
        const scenesAfter = scenes
@@ -342,7 +343,8 @@ export default function Storyboard() {
           video_url: null,
           video_status: 'pending',
           video_request_id: null,
-          video_error: null,
+           video_error: null,
+           video_approved: false,
         });
 
         toast.success(`Scene added ${position} Scene ${referenceScene.scene_number}`);

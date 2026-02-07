@@ -55,5 +55,6 @@ export interface Scene {
   video_status: GenerationStatus;
   video_request_id: string | null;
   video_error: string | null;
+  video_approved: boolean;
   created_at: string;
 }
