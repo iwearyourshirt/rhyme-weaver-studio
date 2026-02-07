@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X, Save } from 'lucide-react';
+import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X, Save, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -317,30 +317,44 @@ export function VideoSceneCard({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Row 6: Generate Button */}
-          <Button
-            variant={scene.video_status === 'done' ? 'outline' : 'default'}
-            className="w-full h-9"
-            onClick={onGenerate}
-            disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating' || hasPromptChanges || (anyGenerating && !isGenerating)}
-          >
-            {scene.video_status === 'done' ? (
-              <>
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                Regenerate
-              </>
-            ) : scene.video_status === 'failed' ? (
-              <>
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                Retry
-              </>
-            ) : (
-              <>
-                <Wand2 className="h-3.5 w-3.5 mr-1.5" />
-                Generate
-              </>
+          {/* Row 6: Generate / Download Buttons */}
+          <div className="flex gap-2">
+            <Button
+              variant={scene.video_status === 'done' ? 'outline' : 'default'}
+              className="flex-1 h-9"
+              onClick={onGenerate}
+              disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating' || hasPromptChanges || (anyGenerating && !isGenerating)}
+            >
+              {scene.video_status === 'done' ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  Regenerate
+                </>
+              ) : scene.video_status === 'failed' ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  Retry
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+                  Generate
+                </>
+              )}
+            </Button>
+            {scene.video_status === 'done' && scene.video_url && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 flex-shrink-0"
+                asChild
+              >
+                <a href={scene.video_url} download={`scene-${scene.scene_number}.mp4`} target="_blank" rel="noopener noreferrer">
+                  <Download className="h-3.5 w-3.5" />
+                </a>
+              </Button>
             )}
-          </Button>
+          </div>
         </CardContent>
       </div>
     </Card>

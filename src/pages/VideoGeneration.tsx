@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, Wand2, Video, DollarSign } from 'lucide-react';
+import { ArrowRight, Wand2, Video, DollarSign, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -425,6 +425,30 @@ export default function VideoGeneration() {
             {generatingCount > 0 && ` (${generatingCount} generating)`}
           </div>
           <Progress value={(doneCount / totalCount) * 100} className="w-24 h-1.5" />
+          {doneCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => {
+                const doneScenes = scenes?.filter((s) => s.video_status === 'done' && s.video_url) || [];
+                doneScenes.forEach((scene) => {
+                  const link = document.createElement('a');
+                  link.href = scene.video_url!;
+                  link.download = `scene-${scene.scene_number}.mp4`;
+                  link.target = '_blank';
+                  link.rel = 'noopener noreferrer';
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                });
+                toast.success(`Downloading ${doneScenes.length} video${doneScenes.length > 1 ? 's' : ''}`);
+              }}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download All ({doneCount})
+            </Button>
+          )}
         </div>
       </div>
 
