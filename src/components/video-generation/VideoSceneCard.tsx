@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X, Save, Download, Check, Trash2 } from 'lucide-react';
+import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X, Download, Check, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { PromptFeedback } from '@/components/storyboard/PromptFeedback';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useAnimationPrompt } from '@/hooks/useAnimationPrompt';
 import type { Scene, ShotType } from '@/types/database';
 
 const SHOT_TYPE_OPTIONS: { value: ShotType; label: string }[] = [
@@ -26,9 +27,8 @@ interface VideoSceneCardProps {
   isGenerating: boolean;
   anyGenerating?: boolean;
   isCancelling?: boolean;
-  onGenerate: () => void;
+  onGenerate: (prompt: string) => void;
   onCancel: () => void;
-  onUpdatePrompt: (prompt: string) => Promise<void>;
   onUpdateShotType: (shotType: ShotType) => Promise<void>;
   onApprovalChange: (approved: boolean) => void;
   onDeleteVideo: () => Promise<void>;
@@ -40,8 +40,6 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// LTX Video 2.0 Fast: generation is fast but fal.ai queue wait adds time
-// Typical total: 1-3 minutes including queue wait
 const BASE_GENERATION_TIME = 90;
 const MAX_GENERATION_TIME = 180;
 
@@ -53,7 +51,6 @@ export function VideoSceneCard({
   isCancelling = false,
   onGenerate,
   onCancel,
-  onUpdatePrompt,
   onUpdateShotType,
   onApprovalChange,
   onDeleteVideo,
@@ -61,14 +58,18 @@ export function VideoSceneCard({
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPromptOpen, setIsPromptOpen] = useState(false);
-  const [editedPrompt, setEditedPrompt] = useState(scene.animation_prompt);
   const videoRef = useRef<HTMLVideoElement>(null);
   const startTimeRef = useRef<number | null>(null);
-  // Track whether this generation was initiated in-session vs already running on mount
   const isResumedRef = useRef(false);
-  // Timestamp of last successful save — blocks external syncs for a cooldown period
-  const lastSaveTimeRef = useRef<number>(0);
-  const SAVE_COOLDOWN_MS = 5000; // 5 seconds cooldown after save
+
+  // Use the new prompt hook — local state is the source of truth
+  const {
+    prompt: editedPrompt,
+    onChange: onPromptChange,
+    flushSave,
+    setAndSave,
+    isSaving,
+  } = useAnimationPrompt(scene.id, projectId, scene.animation_prompt);
 
   // Timer effect for generation progress
   useEffect(() => {
@@ -76,8 +77,6 @@ export function VideoSceneCard({
     
     if (isActuallyGeneratingNow) {
       if (!startTimeRef.current) {
-        // If we didn't initiate this generation (isGenerating from parent is false),
-        // it's a resumed/in-progress generation from before page load
         isResumedRef.current = !isGenerating;
         startTimeRef.current = Date.now();
       }
@@ -95,16 +94,6 @@ export function VideoSceneCard({
     }
   }, [scene.video_status]);
 
-  // Sync edited prompt from server ONLY when no recent local save or edit
-  useEffect(() => {
-    const timeSinceLastSave = Date.now() - lastSaveTimeRef.current;
-    if (timeSinceLastSave < SAVE_COOLDOWN_MS) {
-      // Still in cooldown after a save — ignore external sync
-      return;
-    }
-    setEditedPrompt(scene.animation_prompt);
-  }, [scene.animation_prompt]);
-
   const handlePlayPause = () => {
     if (videoRef.current) {
       if (isPlaying) {
@@ -120,41 +109,28 @@ export function VideoSceneCard({
     setIsPlaying(false);
   };
 
-  const [isSaving, setIsSaving] = useState(false);
-  const hasPromptChanges = editedPrompt !== scene.animation_prompt;
-
-  const handleSavePrompt = async () => {
-    if (!hasPromptChanges) return;
-    setIsSaving(true);
-    try {
-      await onUpdatePrompt(editedPrompt);
-      lastSaveTimeRef.current = Date.now(); // Start cooldown
-    } finally {
-      setIsSaving(false);
-    }
+  const handleGenerate = async () => {
+    // Flush any pending debounced save before generating
+    await flushSave();
+    onGenerate(editedPrompt);
   };
 
   const handlePromptRewritten = (newPrompt: string) => {
-    setEditedPrompt(newPrompt);
-    lastSaveTimeRef.current = Date.now(); // Start cooldown
-    onUpdatePrompt(newPrompt);
+    setAndSave(newPrompt);
   };
 
   const isActuallyGenerating = isGenerating || scene.video_status === 'generating';
   const canGenerate = scene.image_status === 'done' && scene.image_url;
 
-  // Adaptive progress calculation - slows down as it approaches completion
   const getAdaptiveProgress = () => {
     if (elapsedTime < BASE_GENERATION_TIME) {
-      // Normal progress up to base time (0-80%)
       return (elapsedTime / BASE_GENERATION_TIME) * 80;
     } else if (elapsedTime < MAX_GENERATION_TIME) {
-      // Slow progress from 80% to 95% for longer generations
       const overtime = elapsedTime - BASE_GENERATION_TIME;
       const overtimeMax = MAX_GENERATION_TIME - BASE_GENERATION_TIME;
       return 80 + (overtime / overtimeMax) * 15;
     }
-    return 95; // Cap at 95%
+    return 95;
   };
 
   const progressPercent = getAdaptiveProgress();
@@ -171,7 +147,6 @@ export function VideoSceneCard({
 
   return (
     <Card className="border overflow-hidden">
-      {/* Horizontal layout: video left, controls right */}
       <div className="flex flex-row">
         {/* Video/Image Area */}
         <div className="w-1/2 aspect-video bg-muted relative flex-shrink-0">
@@ -252,7 +227,7 @@ export function VideoSceneCard({
             </div>
           )}
 
-          {/* Delete video button (top-left) */}
+          {/* Delete video button */}
           {scene.video_status === 'done' && scene.video_url && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -277,7 +252,7 @@ export function VideoSceneCard({
             </AlertDialog>
           )}
 
-          {/* Approval checkbox (top-right) */}
+          {/* Approval checkbox */}
           {scene.video_status === 'done' && scene.video_url && (
             <button 
               className={`absolute top-2 right-2 flex items-center justify-center w-6 h-6 rounded transition-colors z-10 ${
@@ -300,23 +275,19 @@ export function VideoSceneCard({
 
         {/* Content Area */}
         <CardContent className="w-1/2 p-4 space-y-3 overflow-y-auto">
-          {/* Row 1: Scene number + Status */}
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Scene {scene.scene_number}</span>
             <StatusBadge status={scene.video_status} />
           </div>
 
-          {/* Row 2: Time range */}
           <p className="text-xs text-muted-foreground font-mono">
             {formatTime(scene.start_time)} – {formatTime(scene.end_time)}
           </p>
 
-          {/* Row 3: Lyric snippet */}
           <p className="text-xs text-muted-foreground italic line-clamp-2 leading-relaxed">
             "{scene.lyric_snippet}"
           </p>
 
-          {/* Row 4: Shot Type Selector */}
           <Select
             value={scene.shot_type}
             onValueChange={(value: ShotType) => onUpdateShotType(value)}
@@ -333,33 +304,24 @@ export function VideoSceneCard({
             </SelectContent>
           </Select>
 
-          {/* Row 5: Animation Prompt Editor */}
+          {/* Animation Prompt Editor */}
           <Collapsible open={isPromptOpen} onOpenChange={setIsPromptOpen}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="w-full justify-between px-0 h-8 hover:bg-transparent">
-                <span className="text-xs font-medium">Animation Prompt</span>
+                <span className="text-xs font-medium flex items-center gap-1.5">
+                  Animation Prompt
+                  {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                </span>
                 {isPromptOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-3 pt-2">
               <Textarea
                 value={editedPrompt}
-                onChange={(e) => { setEditedPrompt(e.target.value); lastSaveTimeRef.current = Date.now(); }}
+                onChange={(e) => onPromptChange(e.target.value)}
                 className="text-xs min-h-[60px] resize-none"
                 placeholder="Animation prompt..."
               />
-              {hasPromptChanges && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-8 text-xs"
-                  onClick={handleSavePrompt}
-                  disabled={isSaving}
-                >
-                  <Save className="h-3 w-3 mr-1.5" />
-                  {isSaving ? 'Saving...' : 'Save Prompt'}
-                </Button>
-              )}
               <PromptFeedback
                 currentPrompt={editedPrompt}
                 sceneDescription={scene.scene_description}
@@ -370,13 +332,13 @@ export function VideoSceneCard({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Row 6: Generate / Download Buttons */}
+          {/* Generate / Download Buttons */}
           <div className="flex gap-2">
             <Button
               variant={scene.video_status === 'done' ? 'outline' : 'default'}
               className="flex-1 h-9"
-              onClick={onGenerate}
-              disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating' || hasPromptChanges}
+              onClick={handleGenerate}
+              disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating'}
             >
               {scene.video_status === 'done' ? (
                 <>
