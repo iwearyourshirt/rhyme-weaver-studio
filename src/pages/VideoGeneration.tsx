@@ -315,30 +315,11 @@ export default function VideoGeneration() {
 
     setIsGeneratingAll(true);
 
-    // Generate one at a time to avoid edge function failures
-    for (const scene of pendingScenes) {
-      await generateVideo(scene.id);
-      // Wait for this scene to finish before starting next
-      // Poll until the scene status changes from 'generating'
-      let attempts = 0;
-      const maxAttempts = 120; // 10 minutes max wait (5s intervals)
-      while (attempts < maxAttempts) {
-        await sleep(5000);
-        attempts++;
-        const { data: statusRow } = await supabase
-          .from('scenes')
-          .select('video_status')
-          .eq('id', scene.id)
-          .single();
-        if (statusRow?.video_status === 'done' || statusRow?.video_status === 'failed') {
-          refetchScenes();
-          break;
-        }
-      }
-    }
+    // Fire all generations concurrently — fal.ai queues them independently
+    await Promise.all(pendingScenes.map((scene) => generateVideo(scene.id)));
 
     setIsGeneratingAll(false);
-    toast.success('All video generations complete');
+    toast.success('All video generations submitted');
   };
 
   const handleCancelAll = async () => {
