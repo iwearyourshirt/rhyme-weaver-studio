@@ -211,7 +211,7 @@ export function VideoSceneCard({
           )}
 
           {/* Generating overlay */}
-          {isActuallyGenerating && (
+          {isActuallyGenerating && scene.video_status !== 'failed' && (
             <div className="absolute inset-0 bg-background/95 flex flex-col items-center justify-center gap-2 p-4">
               <div className="animate-spin rounded-full h-5 w-5 border-2 border-foreground border-t-transparent" />
               <p className="text-xs font-medium">{isCancelling ? 'Cancelling...' : 'Generating...'}</p>
