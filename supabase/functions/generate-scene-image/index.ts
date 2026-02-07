@@ -233,11 +233,10 @@ function getShotTypeInstruction(shotType: string): string {
             }
           }
           
-          // If we ONLY have environment references and no characters, skip reference images
-          // to prevent OpenAI from hallucinating characters from environment images
-          if (!hasNonEnvironmentReference) {
-            console.log(`[BG] No character references — using text-only generation to avoid hallucinated characters`);
-            referenceImages.length = 0;
+          // If we ONLY have environment references and no characters, KEEP the references
+          // but add an explicit instruction to avoid hallucinating characters/figures
+          if (!hasNonEnvironmentReference && referenceImages.length > 0) {
+            console.log(`[BG] Environment-only references — keeping them for visual consistency, adding no-character instruction`);
           }
          
          console.log(`[BG] Reference images to send: ${referenceImages.length}`);
@@ -259,10 +258,13 @@ function getShotTypeInstruction(shotType: string): string {
            cinematographyPrefix = `${cinematographyDirection}. `;
          }
          
-         let finalPrompt = `${stylePrefix}${cinematographyPrefix}${shotTypeInstruction} ${scene.image_prompt}`;
-         if (referenceImages.length > 0) {
-           finalPrompt = `Use the provided reference images as character and environment design guides. Match their exact appearance, proportions, colors, and style. ${stylePrefix}${cinematographyPrefix}${shotTypeInstruction} ${scene.image_prompt}`;
-         }
+          let finalPrompt = `${stylePrefix}${cinematographyPrefix}${shotTypeInstruction} ${scene.image_prompt}`;
+          if (referenceImages.length > 0) {
+            const referenceInstruction = hasNonEnvironmentReference
+              ? `Use the provided reference images as character and environment design guides. Match their exact appearance, proportions, colors, and style.`
+              : `Use the provided reference images as environment/setting design guides. Match their exact appearance, colors, textures, and style. Do NOT add any characters, people, figures, or creatures — only show the environment/setting itself.`;
+            finalPrompt = `${referenceInstruction} ${stylePrefix}${cinematographyPrefix}${shotTypeInstruction} ${scene.image_prompt}`;
+          }
          
          console.log(`[BG] Final prompt: ${finalPrompt}`);
          
