@@ -140,12 +140,20 @@ export default function VideoGeneration() {
         for (const update of data.updates) {
           const generationEndTime = Date.now();
           const startTime = generationStartTimesRef.current.get(update.scene_id);
+
+          // Clear from generatingIds so the overlay disappears
+          if (update.status === 'done' || update.status === 'failed') {
+            setGeneratingIds((prev) => {
+              const next = new Set(prev);
+              next.delete(update.scene_id);
+              return next;
+            });
+          }
           
           if (update.status === 'done' && !toastShownRef.current.has(update.scene_id)) {
             toastShownRef.current.add(update.scene_id);
             toast.success(`Scene ${update.scene_number} video generated!`);
             
-            // Update debug context with completion info
             updateVideoSceneStatus({
               sceneNumber: update.scene_number,
               sceneId: update.scene_id,
@@ -160,7 +168,6 @@ export default function VideoGeneration() {
             toastShownRef.current.add(update.scene_id);
             toast.error(`Scene ${update.scene_number} failed: ${update.error || 'Unknown error'}`);
             
-            // Update debug context with failure info
             updateVideoSceneStatus({
               sceneNumber: update.scene_number,
               sceneId: update.scene_id,
