@@ -96,7 +96,28 @@ export function useUpdateScene() {
         characters_in_scene: (data.characters_in_scene as string[]) || [],
       } as Scene;
     },
-    onSuccess: (_, variables) => {
+    onMutate: async (variables) => {
+      // Cancel in-flight refetches so they don't overwrite the optimistic update
+      await queryClient.cancelQueries({ queryKey: ['scenes', variables.projectId] });
+
+      const previousScenes = queryClient.getQueryData<Scene[]>(['scenes', variables.projectId]);
+
+      // Optimistically apply the update to the cache
+      queryClient.setQueryData<Scene[]>(['scenes', variables.projectId], (old) =>
+        old?.map((scene) =>
+          scene.id === variables.id ? { ...scene, ...variables.updates } : scene
+        ) ?? []
+      );
+
+      return { previousScenes };
+    },
+    onError: (_err, variables, context) => {
+      // Rollback on failure
+      if (context?.previousScenes) {
+        queryClient.setQueryData(['scenes', variables.projectId], context.previousScenes);
+      }
+    },
+    onSettled: (_data, _error, variables) => {
       queryClient.invalidateQueries({ queryKey: ['scenes', variables.projectId] });
     },
   });
