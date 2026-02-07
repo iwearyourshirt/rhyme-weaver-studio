@@ -61,6 +61,8 @@ export function VideoSceneCard({
   const startTimeRef = useRef<number | null>(null);
   // Track whether this generation was initiated in-session vs already running on mount
   const isResumedRef = useRef(false);
+  // Track if user has unsaved local edits — prevents external refetches from resetting prompt
+  const hasLocalEditsRef = useRef(false);
 
   // Timer effect for generation progress
   useEffect(() => {
@@ -87,9 +89,11 @@ export function VideoSceneCard({
     }
   }, [scene.video_status]);
 
-  // Reset edited prompt when scene changes
+  // Sync edited prompt from server ONLY when user has no local edits
   useEffect(() => {
-    setEditedPrompt(scene.animation_prompt);
+    if (!hasLocalEditsRef.current) {
+      setEditedPrompt(scene.animation_prompt);
+    }
   }, [scene.animation_prompt]);
 
   const handlePlayPause = () => {
@@ -115,6 +119,7 @@ export function VideoSceneCard({
     setIsSaving(true);
     try {
       await onUpdatePrompt(editedPrompt);
+      hasLocalEditsRef.current = false; // Clear flag after successful save
     } finally {
       setIsSaving(false);
     }
@@ -122,6 +127,7 @@ export function VideoSceneCard({
 
   const handlePromptRewritten = (newPrompt: string) => {
     setEditedPrompt(newPrompt);
+    hasLocalEditsRef.current = false; // AI rewrite saves immediately
     onUpdatePrompt(newPrompt);
   };
 
@@ -291,7 +297,7 @@ export function VideoSceneCard({
             <CollapsibleContent className="space-y-3 pt-2">
               <Textarea
                 value={editedPrompt}
-                onChange={(e) => setEditedPrompt(e.target.value)}
+                onChange={(e) => { setEditedPrompt(e.target.value); hasLocalEditsRef.current = true; }}
                 className="text-xs min-h-[60px] resize-none"
                 placeholder="Animation prompt..."
               />
