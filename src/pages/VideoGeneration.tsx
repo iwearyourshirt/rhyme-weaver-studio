@@ -227,78 +227,104 @@ export default function VideoGeneration() {
       generationStartTime,
     });
 
-    try {
-      const response = await supabase.functions.invoke('generate-scene-video', {
-        body: {
-          scene_id: sceneId,
-          project_id: projectId,
-          image_url: scene.image_url,
-          animation_prompt: scene.animation_prompt,
-          scene_description: scene.scene_description,
-          shot_type: scene.shot_type,
-          animation_direction: project?.animation_direction,
-        },
-      });
+    const MAX_RETRIES = 3;
+    let lastError: Error | null = null;
 
-      if (response.error) {
-        console.error('Edge function error:', response.error);
-
-        // Even on network error, the edge function may have started.
-        // Wait briefly and check if status moved to "generating".
-        if (isNetworkishInvokeError(response.error.message)) {
-          await sleep(2000);
-          try {
-            const { data: statusRow } = await supabase
-              .from('scenes')
-              .select('video_status')
-              .eq('id', sceneId)
-              .single();
-            if (statusRow?.video_status === 'generating' || statusRow?.video_status === 'done') {
-              // Edge function started successfully despite network error — polling will handle the rest
-              console.log(`Scene ${sceneId} is already generating despite network error`);
-              return;
-            }
-          } catch { /* ignore */ }
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) {
+          // Exponential backoff: 2s, 4s
+          const delay = 2000 * Math.pow(2, attempt - 1);
+          console.log(`Scene ${scene.scene_number}: Retry attempt ${attempt}/${MAX_RETRIES - 1} after ${delay}ms...`);
+          await sleep(delay);
         }
 
-        throw new Error(response.error.message);
+        const response = await supabase.functions.invoke('generate-scene-video', {
+          body: {
+            scene_id: sceneId,
+            project_id: projectId,
+            image_url: scene.image_url,
+            animation_prompt: scene.animation_prompt,
+            scene_description: scene.scene_description,
+            shot_type: scene.shot_type,
+            animation_direction: project?.animation_direction,
+          },
+        });
+
+        if (response.error) {
+          console.error(`Edge function error (attempt ${attempt + 1}):`, response.error);
+
+          if (isNetworkishInvokeError(response.error.message)) {
+            // Check if the edge function actually started despite the network error
+            await sleep(2000);
+            try {
+              const { data: statusRow } = await supabase
+                .from('scenes')
+                .select('video_status')
+                .eq('id', sceneId)
+                .single();
+              if (statusRow?.video_status === 'generating' || statusRow?.video_status === 'done') {
+                console.log(`Scene ${scene.scene_number}: Already generating despite network error`);
+                if (!pollIntervalRef.current) {
+                  pollIntervalRef.current = setInterval(pollVideoStatus, POLL_INTERVAL);
+                }
+                return; // Success — edge function started
+              }
+            } catch { /* ignore */ }
+
+            // Network error and edge function didn't start — retry
+            lastError = new Error(response.error.message);
+            continue;
+          }
+
+          // Non-network error — don't retry
+          throw new Error(response.error.message);
+        }
+
+        // Success
+        logApiCall('Generate Video', { scene_id: sceneId }, response.data);
+        
+        updateVideoSceneStatus({
+          sceneNumber: scene.scene_number,
+          sceneId: sceneId,
+          status: 'generating',
+          requestId: response.data.request_id,
+          generationStartTime,
+        });
+
+        if (!pollIntervalRef.current) {
+          pollIntervalRef.current = setInterval(pollVideoStatus, POLL_INTERVAL);
+        }
+        return; // Success — exit retry loop
+
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+        if (!isNetworkishInvokeError(lastError.message)) {
+          break; // Don't retry non-network errors
+        }
       }
-
-      logApiCall('Generate Video', { scene_id: sceneId }, response.data);
-      
-      // Update debug with request ID
-      updateVideoSceneStatus({
-        sceneNumber: scene.scene_number,
-        sceneId: sceneId,
-        status: 'generating',
-        requestId: response.data.request_id,
-        generationStartTime,
-      });
-
-      // Start polling if not already
-      if (!pollIntervalRef.current) {
-        pollIntervalRef.current = setInterval(pollVideoStatus, POLL_INTERVAL);
-      }
-    } catch (error) {
-      console.error('Error generating video:', error);
-      toast.error(`Failed to start video generation: ${error instanceof Error ? error.message : 'Unknown error'}`);
-
-      // Mark as failed
-      await updateScene.mutateAsync({
-        id: sceneId,
-        projectId: projectId!,
-        updates: {
-          video_status: 'failed',
-          video_error: error instanceof Error ? error.message : 'Failed to start generation',
-        },
-      });
-    } finally {
-      setGeneratingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(sceneId);
-        return next;
-      });
     }
+
+    // All retries exhausted or non-retryable error
+    console.error('Error generating video after retries:', lastError);
+    toast.error(`Failed to start video generation: ${lastError?.message || 'Unknown error'}`);
+    
+    lastMutationTimeRef.current = Date.now();
+    await updateScene.mutateAsync({
+      id: sceneId,
+      projectId: projectId!,
+      updates: {
+        video_status: 'failed',
+        video_error: lastError?.message || 'Failed to start generation',
+      },
+    });
+    lastMutationTimeRef.current = Date.now();
+
+    setGeneratingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(sceneId);
+      return next;
+    });
   };
 
   const handleGenerateAll = async () => {
