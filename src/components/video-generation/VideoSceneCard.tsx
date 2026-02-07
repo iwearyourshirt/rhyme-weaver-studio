@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X, Save, Download, Check } from 'lucide-react';
+import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X, Save, Download, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { PromptFeedback } from '@/components/storyboard/PromptFeedback';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Scene, ShotType } from '@/types/database';
 
 const SHOT_TYPE_OPTIONS: { value: ShotType; label: string }[] = [
@@ -30,6 +31,7 @@ interface VideoSceneCardProps {
   onUpdatePrompt: (prompt: string) => Promise<void>;
   onUpdateShotType: (shotType: ShotType) => Promise<void>;
   onApprovalChange: (approved: boolean) => void;
+  onDeleteVideo: () => Promise<void>;
 }
 
 function formatTime(seconds: number): string {
@@ -54,6 +56,7 @@ export function VideoSceneCard({
   onUpdatePrompt,
   onUpdateShotType,
   onApprovalChange,
+  onDeleteVideo,
 }: VideoSceneCardProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -249,7 +252,32 @@ export function VideoSceneCard({
             </div>
           )}
 
-          {/* Approval checkbox */}
+          {/* Delete video button (top-left) */}
+          {scene.video_status === 'done' && scene.video_url && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button className="absolute top-2 left-2 flex items-center justify-center w-6 h-6 rounded bg-white/90 text-muted-foreground border border-border hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors z-10">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete video for Scene {scene.scene_number}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will remove the generated video and revert the scene back to its image. You can regenerate the video afterwards.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={onDeleteVideo} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Delete Video
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          {/* Approval checkbox (top-right) */}
           {scene.video_status === 'done' && scene.video_url && (
             <button 
               className={`absolute top-2 right-2 flex items-center justify-center w-6 h-6 rounded transition-colors z-10 ${

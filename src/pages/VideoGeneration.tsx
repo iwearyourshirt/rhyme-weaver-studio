@@ -366,6 +366,22 @@ export default function VideoGeneration() {
     toast.success('Prompt saved');
   };
 
+  const handleDeleteVideo = async (sceneId: string) => {
+    await updateScene.mutateAsync({
+      id: sceneId,
+      projectId: projectId!,
+      updates: {
+        video_url: null,
+        video_status: 'pending',
+        video_request_id: null,
+        video_error: null,
+        video_approved: false,
+      },
+    });
+    toastShownRef.current.delete(sceneId);
+    toast.success('Video deleted');
+  };
+
   const cancelVideoGeneration = async (sceneId: string) => {
     const scene = scenes?.find((s) => s.id === sceneId);
     if (!scene) return;
@@ -543,6 +559,7 @@ export default function VideoGeneration() {
                   updates: { video_approved: approved },
                 });
               }}
+              onDeleteVideo={() => handleDeleteVideo(scene.id)}
             />
           ))}
         </div>
