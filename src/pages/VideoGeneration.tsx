@@ -67,17 +67,22 @@ export default function VideoGeneration() {
 
   // Fallback: refetch scenes from DB every 8s while any are generating
   // This catches cases where Realtime misses updates (channel errors)
+  // IMPORTANT: Skip refetch if there are active mutations to avoid overwriting optimistic updates
   useEffect(() => {
     const hasGenerating = scenes?.some((s) => s.video_status === 'generating');
     if (!hasGenerating) return;
 
     const interval = setInterval(() => {
+      if (updateScene.isPending) {
+        console.log('[Video poll fallback] Skipping refetch — mutation in progress');
+        return;
+      }
       console.log('[Video poll fallback] Refetching scenes from DB...');
       refetchScenes();
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [scenes?.filter((s) => s.video_status === 'generating').length, refetchScenes]);
+  }, [scenes?.filter((s) => s.video_status === 'generating').length, refetchScenes, updateScene.isPending]);
 
   // Calculate estimated cost
   const estimatedCost = (readyToGenerateCount * COST_PER_VIDEO).toFixed(2);
