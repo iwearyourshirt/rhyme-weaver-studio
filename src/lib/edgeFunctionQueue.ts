@@ -26,21 +26,27 @@ class EdgeFunctionQueue {
     if (this.running) return;
     this.running = true;
 
-    while (this.queue.length > 0) {
-      const item = this.queue.shift()!;
-      try {
-        const result = await item.fn();
-        item.resolve(result);
-      } catch (err) {
-        item.reject(err);
+    try {
+      while (this.queue.length > 0) {
+        const item = this.queue.shift()!;
+        try {
+          const result = await item.fn();
+          item.resolve(result);
+        } catch (err) {
+          item.reject(err);
+        }
+        // Small delay between requests to let connections close
+        if (this.queue.length > 0) {
+          await new Promise((r) => setTimeout(r, this.delayMs));
+        }
       }
-      // Small delay between requests to let connections close
+    } finally {
+      this.running = false;
+      // If items were enqueued while we were finishing, restart processing
       if (this.queue.length > 0) {
-        await new Promise((r) => setTimeout(r, this.delayMs));
+        this.process();
       }
     }
-
-    this.running = false;
   }
 }
 
