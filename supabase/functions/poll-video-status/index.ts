@@ -167,7 +167,25 @@ Deno.serve(async (req) => {
             const videoUrl = result.video?.url;
 
             if (videoUrl) {
-              // Log video generation cost - $0.24 per 6-second clip
+              // Dedup guard: only update if scene is still 'generating' (prevents double-logging on overlapping polls)
+              const { data: updateResult, error: updateError } = await supabase
+                .from("scenes")
+                .update({
+                  video_status: "done",
+                  video_url: videoUrl,
+                  video_error: null,
+                })
+                .eq("id", scene.id)
+                .eq("video_status", "generating") // Only update if still generating — atomic guard
+                .select("id");
+
+              // If no rows updated, another poll already handled this scene
+              if (updateError || !updateResult || updateResult.length === 0) {
+                console.log(`Scene ${scene.scene_number} already processed by another poll, skipping cost log`);
+                continue;
+              }
+
+              // Log video generation cost only once (after successful atomic update)
               await logAICost(
                 supabaseUrl,
                 supabaseKey,
@@ -176,15 +194,6 @@ Deno.serve(async (req) => {
                 `Video clip scene ${scene.scene_number}`,
                 VIDEO_COST_PER_CLIP
               );
-
-              await supabase
-                .from("scenes")
-                .update({
-                  video_status: "done",
-                  video_url: videoUrl,
-                  video_error: null,
-                })
-                .eq("id", scene.id);
 
               updates.push({
                 scene_id: scene.id,
