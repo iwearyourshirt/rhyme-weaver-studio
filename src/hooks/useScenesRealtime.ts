@@ -1,21 +1,31 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, MutableRefObject } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Scene } from '@/types/database';
 
-export function useScenesRealtime(projectId: string | undefined) {
+const MUTATION_COOLDOWN_MS = 5000;
+
+export function useScenesRealtime(
+  projectId: string | undefined,
+  lastMutationTimeRef?: MutableRefObject<number>
+) {
   const queryClient = useQueryClient();
 
-  // Force immediate refetch function
+  // Force immediate refetch function (respects cooldown)
   const refetchScenes = useCallback(() => {
-    if (projectId) {
-      // Use refetchQueries for immediate refetch instead of just invalidation
-      queryClient.refetchQueries({ 
-        queryKey: ['scenes', projectId],
-        exact: true,
-      });
+    if (!projectId) return;
+
+    // Skip refetch if a mutation happened recently
+    if (lastMutationTimeRef && Date.now() - lastMutationTimeRef.current < MUTATION_COOLDOWN_MS) {
+      console.log('[Realtime] Skipping refetch — mutation cooldown active');
+      return;
     }
-  }, [projectId, queryClient]);
+
+    queryClient.refetchQueries({ 
+      queryKey: ['scenes', projectId],
+      exact: true,
+    });
+  }, [projectId, queryClient, lastMutationTimeRef]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -34,7 +44,6 @@ export function useScenesRealtime(projectId: string | undefined) {
         },
         (payload) => {
           console.log('[Realtime] Scene updated:', payload.new);
-          // Force immediate refetch for updates (video/image status changes)
           refetchScenes();
         }
       )

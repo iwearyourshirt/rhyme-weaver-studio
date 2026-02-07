@@ -28,8 +28,11 @@ export default function VideoGeneration() {
   const updateProject = useUpdateProject();
   const { setCurrentPage, setProjectData, logApiCall, updateVideoSceneStatus, setVideoModel } = useDebug();
 
+  // Tracks last mutation time — realtime & fallback polling skip refetches during cooldown
+  const lastMutationTimeRef = useRef<number>(0);
+
   // Enable realtime updates and get refetch function
-  const { refetchScenes } = useScenesRealtime(projectId);
+  const { refetchScenes } = useScenesRealtime(projectId, lastMutationTimeRef);
 
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [cancellingIds, setCancellingIds] = useState<Set<string>>(new Set());
@@ -76,8 +79,9 @@ export default function VideoGeneration() {
     if (!hasGenerating) return;
 
     const interval = setInterval(() => {
-      if (updateScene.isPending) {
-        console.log('[Video poll fallback] Skipping refetch — mutation in progress');
+      const timeSinceMutation = Date.now() - lastMutationTimeRef.current;
+      if (updateScene.isPending || timeSinceMutation < 5000) {
+        console.log('[Video poll fallback] Skipping refetch — mutation cooldown active');
         return;
       }
       console.log('[Video poll fallback] Refetching scenes from DB...');
@@ -358,15 +362,18 @@ export default function VideoGeneration() {
   };
 
   const handleUpdatePrompt = async (sceneId: string, newPrompt: string) => {
+    lastMutationTimeRef.current = Date.now();
     await updateScene.mutateAsync({
       id: sceneId,
       projectId: projectId!,
       updates: { animation_prompt: newPrompt },
     });
+    lastMutationTimeRef.current = Date.now(); // Reset after completion too
     toast.success('Prompt saved');
   };
 
   const handleDeleteVideo = async (sceneId: string) => {
+    lastMutationTimeRef.current = Date.now();
     await updateScene.mutateAsync({
       id: sceneId,
       projectId: projectId!,
@@ -378,6 +385,7 @@ export default function VideoGeneration() {
         video_approved: false,
       },
     });
+    lastMutationTimeRef.current = Date.now();
     toastShownRef.current.delete(sceneId);
     toast.success('Video deleted');
   };
@@ -546,13 +554,16 @@ export default function VideoGeneration() {
               onCancel={() => cancelVideoGeneration(scene.id)}
               onUpdatePrompt={(prompt) => handleUpdatePrompt(scene.id, prompt)}
               onUpdateShotType={async (shotType) => {
+                lastMutationTimeRef.current = Date.now();
                 await updateScene.mutateAsync({
                   id: scene.id,
                   projectId: projectId!,
                   updates: { shot_type: shotType }
                 });
+                lastMutationTimeRef.current = Date.now();
               }}
               onApprovalChange={(approved) => {
+                lastMutationTimeRef.current = Date.now();
                 updateScene.mutate({
                   id: scene.id,
                   projectId: projectId!,
