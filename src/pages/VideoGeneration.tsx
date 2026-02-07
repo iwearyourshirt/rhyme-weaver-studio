@@ -315,8 +315,13 @@ export default function VideoGeneration() {
 
     setIsGeneratingAll(true);
 
-    // Fire all generations concurrently — fal.ai queues them independently
-    await Promise.all(pendingScenes.map((scene) => generateVideo(scene.id)));
+    // Stagger requests by 800ms to avoid overwhelming edge function connections
+    const results = [];
+    for (let i = 0; i < pendingScenes.length; i++) {
+      if (i > 0) await sleep(800);
+      results.push(generateVideo(pendingScenes[i].id));
+    }
+    await Promise.all(results);
 
     setIsGeneratingAll(false);
     toast.success('All video generations submitted');
