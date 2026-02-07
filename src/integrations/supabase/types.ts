@@ -158,6 +158,7 @@ export type Database = {
           scene_number: number
           shot_type: string
           start_time: number
+          video_approved: boolean
           video_error: string | null
           video_request_id: string | null
           video_status: string
@@ -179,6 +180,7 @@ export type Database = {
           scene_number: number
           shot_type?: string
           start_time: number
+          video_approved?: boolean
           video_error?: string | null
           video_request_id?: string | null
           video_status?: string
@@ -200,6 +202,7 @@ export type Database = {
           scene_number?: number
           shot_type?: string
           start_time?: number
+          video_approved?: boolean
           video_error?: string | null
           video_request_id?: string | null
           video_status?: string

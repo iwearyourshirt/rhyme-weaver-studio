@@ -20,6 +20,7 @@ export function useScenes(projectId: string | undefined) {
         end_time: Number(scene.end_time),
         characters_in_scene: (scene.characters_in_scene as string[]) || [],
         image_approved: scene.image_approved ?? false,
+        video_approved: (scene as any).video_approved ?? false,
       })) as Scene[];
     },
     enabled: !!projectId,
@@ -75,6 +76,7 @@ export function useUpdateScene() {
         video_status: GenerationStatus;
         video_request_id: string | null;
         video_error: string | null;
+        video_approved: boolean;
         scene_number: number;
         start_time: number;
         end_time: number;

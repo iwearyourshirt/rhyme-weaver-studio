@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X, Save, Download } from 'lucide-react';
+import { Wand2, RefreshCw, Video, Play, Pause, AlertCircle, ChevronDown, ChevronUp, X, Save, Download, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -29,6 +29,7 @@ interface VideoSceneCardProps {
   onCancel: () => void;
   onUpdatePrompt: (prompt: string) => Promise<void>;
   onUpdateShotType: (shotType: ShotType) => Promise<void>;
+  onApprovalChange: (approved: boolean) => void;
 }
 
 function formatTime(seconds: number): string {
@@ -52,6 +53,7 @@ export function VideoSceneCard({
   onCancel,
   onUpdatePrompt,
   onUpdateShotType,
+  onApprovalChange,
 }: VideoSceneCardProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -243,7 +245,20 @@ export function VideoSceneCard({
             </div>
           )}
 
-          {/* No image overlay */}
+          {/* Approval checkbox */}
+          {scene.video_status === 'done' && scene.video_url && (
+            <button 
+              className={`absolute top-2 right-2 flex items-center justify-center w-6 h-6 rounded transition-colors z-10 ${
+                scene.video_approved 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-white/90 text-muted-foreground border border-border hover:bg-white'
+              }`}
+              onClick={() => onApprovalChange(!scene.video_approved)}
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          )}
+
           {!canGenerate && scene.video_status === 'pending' && (
             <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
               <p className="text-xs text-muted-foreground">Generate scene image first</p>
