@@ -208,9 +208,10 @@ export default function VideoGeneration() {
     );
   };
 
-  const generateVideo = async (sceneId: string) => {
+  const generateVideo = async (sceneId: string, promptOverride?: string) => {
     const scene = scenes?.find((s) => s.id === sceneId);
     if (!scene || !scene.image_url) return;
+    const animationPrompt = promptOverride || scene.animation_prompt;
     
     // Prevent duplicate generation if already in progress
     if (scene.video_status === 'generating') return;
@@ -244,7 +245,7 @@ export default function VideoGeneration() {
             scene_id: sceneId,
             project_id: projectId,
             image_url: scene.image_url,
-            animation_prompt: scene.animation_prompt,
+            animation_prompt: animationPrompt,
             scene_description: scene.scene_description,
             shot_type: scene.shot_type,
             animation_direction: project?.animation_direction,
@@ -373,16 +374,7 @@ export default function VideoGeneration() {
     toast.success(`Cancelled ${generatingScenes.length} video generations`);
   };
 
-  const handleUpdatePrompt = async (sceneId: string, newPrompt: string) => {
-    lastMutationTimeRef.current = Date.now();
-    await updateScene.mutateAsync({
-      id: sceneId,
-      projectId: projectId!,
-      updates: { animation_prompt: newPrompt },
-    });
-    lastMutationTimeRef.current = Date.now(); // Reset after completion too
-    toast.success('Prompt saved');
-  };
+  // handleUpdatePrompt removed — prompt saving is now handled by useAnimationPrompt hook in VideoSceneCard
 
   const handleDeleteVideo = async (sceneId: string) => {
     lastMutationTimeRef.current = Date.now();
@@ -562,9 +554,8 @@ export default function VideoGeneration() {
               isGenerating={generatingIds.has(scene.id) || scene.video_status === 'generating'}
               anyGenerating={generatingCount > 0 || isGeneratingAll}
               isCancelling={cancellingIds.has(scene.id)}
-              onGenerate={() => generateVideo(scene.id)}
+              onGenerate={(prompt: string) => generateVideo(scene.id, prompt)}
               onCancel={() => cancelVideoGeneration(scene.id)}
-              onUpdatePrompt={(prompt) => handleUpdatePrompt(scene.id, prompt)}
               onUpdateShotType={async (shotType) => {
                 lastMutationTimeRef.current = Date.now();
                 await updateScene.mutateAsync({
