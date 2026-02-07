@@ -376,7 +376,7 @@ export function VideoSceneCard({
               variant={scene.video_status === 'done' ? 'outline' : 'default'}
               className="flex-1 h-9"
               onClick={onGenerate}
-              disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating' || hasPromptChanges || (anyGenerating && !isGenerating)}
+              disabled={isActuallyGenerating || !canGenerate || scene.video_status === 'generating' || hasPromptChanges}
             >
               {scene.video_status === 'done' ? (
                 <>
